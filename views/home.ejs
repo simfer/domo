@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" dir="ltr">
+<head>
+  <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8" />
+
+  <meta http-equiv="X-UA-Compatible" content="chrome=1">
+  <meta name="google" value="notranslate">
+
+  <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap-theme.min.css">
+  <link href="/assets/styles/style.css" rel="stylesheet">
+  
+  <title>My App</title>
+</head>
+	<body>
+    <input class="btn btn-warning" type="button" id="btnLogout" name="btnLogout" value="Logout" />
+            <div class="container">
+            <div class="led-box">
+                <div id="led01" class="<?=$ledClass?>"></div>
+                <p>Green LED</p>
+            </div>
+        </div>
+        <input class="btn btn-primary" type="button" id="btnOn" name="btnOn" value="Switch on" />
+        <input class="btn btn-primary" type="button" id="btnOff" name="btnOff" value="Switch off" />
+    <script src="/node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="/node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script>
+            $(document).ready(function(){
+                //console.log("TOKEN");
+                //console.log(localStorage.token);
+                var led01 = null;
+                $("#btnLogout").click(function(){
+                    location.href = '/';
+                });
+
+                $("#btnOn").click(function(){
+                    $('#led01').removeClass('led-green-off');
+                    $('#led01').addClass('led-green');
+                    setLed01(0);
+                });
+         
+                $("#btnOff").click(function(){
+                    $('#led01').removeClass('led-green');
+                    $('#led01').addClass('led-green-off');
+                    setLed01(1);
+                });
+        
+        
+                function setLed01(v) {
+                    var form_data = {
+                        "led01": v
+                    };
+                    var settings = {
+                        "async": true,
+                        "url": "api.php",
+                        "method": "POST",
+                        "headers": {
+                            "Authorization" : "Bearer " + localStorage.token,
+                            "content-type" : "application/json",
+                            "cache-control" : "no-cache"
+                        },
+                        "data": JSON.stringify(form_data)
+                    }
+                    console.log(form_data);
+                    //$.ajax(settings).done(function (response, status, xhr) {
+                    //    if (xhr.status == 200) {
+                    //	    console.log(response);
+                    //    } else {
+                    //	    console.log("ERROR: " + xhr.status);
+                    //    }
+                    //});
+                }        
+            });
+        </script>
+        
+    </body>
+</html>
