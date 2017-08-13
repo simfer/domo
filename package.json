@@ -19,8 +19,12 @@
   "dependencies": {
     "body-parser": "^1.17.2",
     "bootstrap": "^3.3.7",
+    "ejs": "^2.5.7",
     "express": "^4.15.4",
     "express-session": "^1.15.5",
-    "jquery": "^3.2.1"
+    "gpio-stream": "^1.0.17",
+    "jquery": "^3.2.1",
+    "onoff": "^1.1.5",
+    "request": "^2.81.0"
   }
 }

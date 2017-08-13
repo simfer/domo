@@ -3,7 +3,12 @@ var hash = require('./pass').hash;
 //var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var session = require('express-session');
-var app = express();
+var app = express.createServer();
+
+var GPIO = require('onoff').Gpio;
+var button = new GPIO(17, 'in', 'both');
+var ledXXX = new GPIO(25, 'out');
+button.watch(light);
 
 // config 
 
@@ -18,7 +23,11 @@ app.use('/assets/styles', express.static(__dirname + '/assets/styles'));
 
 // middleware 
 
-app.use(bodyParser());
+app.use(bodyParser.urlencoded({
+  extended: true
+}));
+app.use(bodyParser.json());
+
 //app.use(cookieParser('shhhh, very secret'));
 //app.use(session()); 
 app.use(session({
@@ -48,6 +57,10 @@ app.get('/home', function(req, res){
 	res.render('home');
 }); 
 
+app.get('/home2', function(req, res){
+	res.render('home2');
+}); 
+
 app.get('/logout', function(req, res){
 	// destroy the user's session to log them out 
 	// will be re-created next request
@@ -58,6 +71,22 @@ app.get('/logout', function(req, res){
 
 app.get('/index', function(req, res){ 
 	res.render('index');
+}); 
+
+app.get('/led', function(req, res){ 
+	var led = new GPIO(25);
+	var v = led.readSync();
+	var out = {'pin':v};
+	res.send(JSON.stringify(out));
+	//res.send('PIN is ' + v);
+}); 
+
+app.post('/led', function(req, res){ 
+	var pin = req.body.pin;
+	var v = req.body.value;
+	var led = new GPIO(pin, 'out');
+	led.writeSync(v);
+	res.send('PIN ' + pin +' is ' + v);
 }); 
 
 app.post('/login', function(req, res){
@@ -104,6 +133,21 @@ function authenticate(name, pass, fn) {
 	fn(new Error('Password non valida'));
 	})
 } 
+
+function light(err, state) {
+	// check the state of the button
+  	// 1 == pressed, 0 == not pressed
+  	if(state == 1) {
+    		// turn LED on
+    		ledXXX.writeSync(1);
+  	} else {
+    		// turn LED off
+    		ledXXX.writeSync(0);
+  	}
+	var request=require('request');
+	var options = {};
+	request.get('http://localhost:3000/home2');
+}
 
 // SERVER START
 app.listen(3000); 
