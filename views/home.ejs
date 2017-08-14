@@ -85,11 +85,11 @@
                 if ($('.cube-switch').hasClass('active')) {
                     $('.cube-switch').removeClass('active');
                     $('#light-bulb').attr('class', 'off col-md-6');
-                    setPin(25,"out",1);
+                    setPin(25,"out",0);
                 } else {
                     $('.cube-switch').addClass('active');
                     $('#light-bulb').attr('class', 'on col-md-6');
-                    setPin(25,"out",0);
+                    setPin(25,"out",1);
                 }
             });
             var socket = io.connect(); //('http://localhost:3000/home');
@@ -114,12 +114,14 @@
                         var json = JSON.parse(response);
                         var pinDirection = json.direction;
                         var pinValue = json.value;
-                        if(pinValue=='1') {
-                            $('#led01').removeClass('led-green-off');
-                            $('#led01').addClass('led-green');
+			console.log("pin value " + pinValue);
+
+                  	if(pinValue=='1') {
+                    		$('.cube-switch').addClass('active');
+                    		$('#light-bulb').attr('class', 'on col-md-6');
                         } else {
-                            $('#led01').removeClass('led-green');
-                            $('#led01').addClass('led-green-off');
+                    		$('.cube-switch').removeClass('active');
+                    		$('#light-bulb').attr('class', 'off col-md-6');
                         };
                     } else {
                         console.log("ERROR: " + xhr.status);

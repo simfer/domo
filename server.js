@@ -5,7 +5,8 @@ var hash = require('./pass').hash;
 
 var routes = require('./routes/index');
 var bodyParser = require("body-parser");
-var GPIO = require("./fakeonoff.js");
+//var GPIO = require("./fakeonoff.js");
+var GPIO = require('onoff').Gpio;
 
 //var cookieParser = require('cookie-parser');
 
@@ -67,21 +68,33 @@ app.use(function(req, res, next){
 app.use('/', routes);
 
 app.get('/checkpin/:pinNumber', function(req, res){ 
-	//app.locals.pin = Math.round(Math.random());
 	var pinNumber = req.params.pinNumber;
-	var out = app.locals.pins[pinNumber];
-	res.send(JSON.stringify(out));
+	var storedPin = app.locals.pins[pinNumber];
+	var pinDirection = app.locals.pins[pinNumber].direction;
+
+	//var pin = new GPIO(pinNumber, pinDirection);
+	var pin = new GPIO(pinNumber);
+
+	//physically read the status of the pin
+    	var pinValue = pin.readSync();
+	
+	//if for some reason the status has changed I update it
+	app.locals.pins[pinNumber].value = pinValue;
+
+	storedPin = app.locals.pins[pinNumber];
+	res.send(JSON.stringify(storedPin));
 }); 
 
 app.post('/setpin', function(req, res){
 	var pinNumber = req.body.number;
 	var pinDirection = req.body.direction;
 	var pinValue = req.body.value;
-
 	app.locals.pins[pinNumber].direction = pinDirection;
 	app.locals.pins[pinNumber].value = pinValue;
-
+	var pin = new GPIO(pinNumber, pinDirection);
+    	pin.writeSync(pinValue);
 	var out = app.locals.pins[pinNumber];
+	console.log(out);
 	res.send(JSON.stringify(out));
 }); 
 
@@ -121,7 +134,6 @@ var io = require('socket.io').listen(server);
 
 // Web Socket Connection
 io.on('connection', function (socket) {
-	console.log("A user is connected");
 	var button = new GPIO(17, 'in', 'both');
 
 	// If we recieved a command from a client to start watering lets do so
