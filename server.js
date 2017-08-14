@@ -1,3 +1,5 @@
+const platform = "PC"; // {PC,RASP}
+
 var express = require('express');
 var session = require('express-session');
 var socket_io = require('socket.io');
@@ -5,8 +7,12 @@ var hash = require('./pass').hash;
 
 var routes = require('./routes/index');
 var bodyParser = require("body-parser");
-//var GPIO = require("./fakeonoff.js");
-var GPIO = require('onoff').Gpio;
+
+if (platform == 'PC') {
+	var GPIO = require("./fakeonoff.js");
+} else {
+	var GPIO = require('onoff').Gpio;	
+}
 
 //var cookieParser = require('cookie-parser');
 

@@ -94,11 +94,18 @@
             });
             var socket = io.connect(); //('http://localhost:3000/home');
             socket.on('example-ping', function (data) {
-    	        console.log(data);
-                //socket.emit("example-ping",data);
-                //$("#result").html();
+                console.log("Data received");
+                console.log(data);
+                var v = data.value;
+                if (v == 1) {
                     $('#alarm').removeClass('hidden');
                     $('#quiet').addClass('hidden');
+                } else {
+                    $('#quiet').removeClass('hidden');
+                    $('#alarm').addClass('hidden');
+                }
+                //socket.emit("example-ping",data);
+                //$("#result").html();
             });
 
             checkPin();
