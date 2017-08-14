@@ -8,70 +8,153 @@
 
   <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap-theme.min.css">
+  <link href="https://fonts.googleapis.com/css?family=Bangers" rel="stylesheet">
+
   <link href="/assets/styles/style.css" rel="stylesheet">
   
-  <title>My App</title>
+  <title>Domotica - Home</title>
 </head>
-	<body>
-    <input class="btn btn-warning" type="button" id="btnLogout" name="btnLogout" value="Logout" />
-            <div class="container">
-            <div class="led-box">
-                <div id="led01" class="<?=$ledClass?>"></div>
-                <p>Green LED</p>
-            </div>
+<body>
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="#">Domotica - Home</a>
+            </div>      
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Azioni <span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a href="#">Il mio profilo</a></li>
+                            <li><a href="#">Impostazioni</a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="/">Logout</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div><!-- /.navbar-collapse -->
+        </div><!-- /.container-fluid -->
+    </nav>
+    <div class="container">
+
+
+        <div class="row">
+            <div id="quiet" class="col-md-12">
+                    <text class="word" dominant-baseline="central" 
+                    fill="white" text-anchor="middle" x="50%" y="50%">Riposo!
+                </text>
+        </div> 
         </div>
-        <input class="btn btn-primary" type="button" id="btnOn" name="btnOn" value="Switch on" />
-        <input class="btn btn-primary" type="button" id="btnOff" name="btnOff" value="Switch off" />
+        
+
+        <div class="row">
+            <div id="alarm" class="col-md-12 hidden">
+                <svg role="img"><title class="title">Allarme</title>
+                    <text class="word" dominant-baseline="central" 
+                        fill="#222" stroke="#222" 
+                        stroke-linecap="round" stroke-width="1.5%" 
+                        text-anchor="middle" x="50%" y="50%">Allarme!
+                    </text>
+                    <text class="word" dominant-baseline="central" 
+                        fill="white" text-anchor="middle" x="50%" y="50%">Allarme!
+                    </text>
+                </svg>
+            </div> 
+        </div>
+        <div class="row">
+            <div href="" class="cube-switch col-md-6">
+                <span class="switch">
+                    <span class="switch-state off">Off</span>
+                    <span class="switch-state on">On</span>
+                </span>
+            </div>
+            <div id="light-bulb" class="off col-md-6">
+                <span class="bulb off"></span>
+                <span class="bulb on"></span>
+            </div>
+        </div>            
+    </div>    
+    
+          
     <script src="/node_modules/jquery/dist/jquery.min.js"></script>
     <script src="/node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-            $(document).ready(function(){
-                //console.log("TOKEN");
-                //console.log(localStorage.token);
-                var led01 = null;
-                $("#btnLogout").click(function(){
-                    location.href = '/';
-                });
-
-                $("#btnOn").click(function(){
-                    $('#led01').removeClass('led-green-off');
-                    $('#led01').addClass('led-green');
-                    setLed01(0);
-                });
-         
-                $("#btnOff").click(function(){
-                    $('#led01').removeClass('led-green');
-                    $('#led01').addClass('led-green-off');
-                    setLed01(1);
-                });
-        
-        
-                function setLed01(v) {
-                    var form_data = {
-                        "led01": v
-                    };
-                    var settings = {
-                        "async": true,
-                        "url": "api.php",
-                        "method": "POST",
-                        "headers": {
-                            "Authorization" : "Bearer " + localStorage.token,
-                            "content-type" : "application/json",
-                            "cache-control" : "no-cache"
-                        },
-                        "data": JSON.stringify(form_data)
-                    }
-                    console.log(form_data);
-                    //$.ajax(settings).done(function (response, status, xhr) {
-                    //    if (xhr.status == 200) {
-                    //	    console.log(response);
-                    //    } else {
-                    //	    console.log("ERROR: " + xhr.status);
-                    //    }
-                    //});
-                }        
+        $(document).ready(function(){
+            $('.cube-switch .switch').click(function() {
+                if ($('.cube-switch').hasClass('active')) {
+                    $('.cube-switch').removeClass('active');
+                    $('#light-bulb').attr('class', 'off col-md-6');
+                    setPin(25,"out",1);
+                } else {
+                    $('.cube-switch').addClass('active');
+                    $('#light-bulb').attr('class', 'on col-md-6');
+                    setPin(25,"out",0);
+                }
             });
-        </script>
-        
-    </body>
+            var socket = io.connect(); //('http://localhost:3000/home');
+            socket.on('example-ping', function (data) {
+    	        console.log(data);
+                //socket.emit("example-ping",data);
+                //$("#result").html();
+                    $('#alarm').removeClass('hidden');
+                    $('#quiet').addClass('hidden');
+            });
+
+            checkPin();
+
+            function checkPin() {
+                var settings = {
+                    "url": "/checkpin/25",
+                    "method": "GET"
+                }
+
+                $.ajax(settings).done(function (response, status, xhr) {
+                    if (xhr.status == 200) {
+                        var json = JSON.parse(response);
+                        var pinDirection = json.direction;
+                        var pinValue = json.value;
+                        if(pinValue=='1') {
+                            $('#led01').removeClass('led-green-off');
+                            $('#led01').addClass('led-green');
+                        } else {
+                            $('#led01').removeClass('led-green');
+                            $('#led01').addClass('led-green-off');
+                        };
+                    } else {
+                        console.log("ERROR: " + xhr.status);
+                    }
+                });
+            }
+
+            function setPin(n,d,v) {
+                var pin = {
+                    "number":n,
+                    "direction":d,
+                    "value": v
+                };
+                var settings = {
+                    "async": true,
+                    "url": "/setpin",
+                    "method": "POST",
+                    "headers": {
+                        "Authorization" : "Bearer 1234",
+                        "content-type" : "application/json",
+                        "cache-control" : "no-cache"
+                    },
+                    "data": JSON.stringify(pin)
+                }
+                $.ajax(settings).done(function (response, status, xhr) {
+                    if (xhr.status == 200) {
+                        console.log(response);
+                    } else {
+                        console.log("ERROR: " + xhr.status);
+                    }
+                });
+            }        
+
+        });
+    </script>
+
+</body>
 </html>

@@ -1,19 +1,21 @@
 var express = require('express');
-var hash = require('./pass').hash;
-//var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
 var session = require('express-session');
-var app = express.createServer();
+var socket_io = require('socket.io');
+var hash = require('./pass').hash;
 
-var GPIO = require('onoff').Gpio;
-var button = new GPIO(17, 'in', 'both');
-var ledXXX = new GPIO(25, 'out');
-button.watch(light);
+var routes = require('./routes/index');
+var bodyParser = require("body-parser");
+var GPIO = require("./fakeonoff.js");
 
-// config 
+//var cookieParser = require('cookie-parser');
 
+var app = express();
+
+app.locals.pins = [];
+app.locals.pins[25] = {'direction':'out','value':Math.round(Math.random())};
+
+app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
-app.set('views', __dirname + '/views'); 
 
 app.use('/static', express.static('public'));
 app.use('/node_modules/bootstrap', express.static(__dirname + '/node_modules/bootstrap'));
@@ -21,21 +23,18 @@ app.use('/node_modules/jquery', express.static(__dirname + '/node_modules/jquery
 app.use('/assets/images', express.static(__dirname + '/assets/images'));
 app.use('/assets/styles', express.static(__dirname + '/assets/styles'));
 
-// middleware 
+//app.use(cookieParser());
 
-app.use(bodyParser.urlencoded({
-  extended: true
-}));
+
+// MIDDLEWARE
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-
-//app.use(cookieParser('shhhh, very secret'));
-//app.use(session()); 
 app.use(session({
     secret:'secret',
     resave: false,
     saveUninitialized: false
 }));
-// Session-persisted message middleware 
+
 
 app.use(function(req, res, next){ 
 	var err = req.session.error;
@@ -46,19 +45,64 @@ app.use(function(req, res, next){
     
 	if (err) res.locals.message ='<div class="alert alert-danger" role="alert"><span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span><span class="sr-only">Errore:</span>' + err + '</div>';
 	if (msg) res.locals.message ='<div class="alert alert-success" role="alert"><span class="glyphicon glyphicon-ok" aria-hidden="true"></span><span class="sr-only">Successo:</span>' + msg + '</div>';
+	console.log(msg);
 	next(); 
 }); 
 
-app.get('/', function(req, res){
-	res.redirect('index');
+//app.use(function(req, res, next) {
+//	var err = new Error('Not Found');
+//	err.status = 404;
+//	next(err);
+//});
+
+//app.use(function(err, req, res, next) {
+//		res.status(err.status || 500);
+//		res.render('error', {
+//		message: err.message,
+//		error: err
+//	});
+//});
+
+app.use('/', routes);
+
+app.get('/checkpin/:pinNumber', function(req, res){ 
+	//app.locals.pin = Math.round(Math.random());
+	var pinNumber = req.params.pinNumber;
+	var out = app.locals.pins[pinNumber];
+	res.send(JSON.stringify(out));
 }); 
 
-app.get('/home', function(req, res){
-	res.render('home');
+app.post('/setpin', function(req, res){
+	var pinNumber = req.body.number;
+	var pinDirection = req.body.direction;
+	var pinValue = req.body.value;
+
+	app.locals.pins[pinNumber].direction = pinDirection;
+	app.locals.pins[pinNumber].value = pinValue;
+
+	var out = app.locals.pins[pinNumber];
+	res.send(JSON.stringify(out));
 }); 
 
-app.get('/home2', function(req, res){
-	res.render('home2');
+app.post('/login', function(req, res){
+	//console.log(req);
+	var username = req.body.username;
+	var password = req.body.password;
+
+	authenticate(username, password, function(err, user){ 
+		if (user) { 
+			req.session.regenerate(function(){
+				// Store the user's primary key 
+				// in the session store to be retrieved,
+				// or in this case the entire user object 
+				req.session.user = user;
+				res.redirect('home'); 
+			}); 
+		} else {
+			req.session.error = 'Utente e/o password non validi!'; 
+			res.redirect('/');
+		} 
+	}); 
 }); 
 
 app.get('/logout', function(req, res){
@@ -69,45 +113,29 @@ app.get('/logout', function(req, res){
 	}); 
 }); 
 
-app.get('/index', function(req, res){ 
-	res.render('index');
-}); 
+var server = app.listen(3000);
+console.log('Express started on port ' + 3000); 
 
-app.get('/led', function(req, res){ 
-	var led = new GPIO(25);
-	var v = led.readSync();
-	var out = {'pin':v};
-	res.send(JSON.stringify(out));
-	//res.send('PIN is ' + v);
-}); 
+var io = require('socket.io').listen(server);
 
-app.post('/led', function(req, res){ 
-	var pin = req.body.pin;
-	var v = req.body.value;
-	var led = new GPIO(pin, 'out');
-	led.writeSync(v);
-	res.send('PIN ' + pin +' is ' + v);
-}); 
+// Web Socket Connection
+io.on('connection', function (socket) {
+	console.log("A user is connected");
+	var button = new GPIO(17, 'in', 'both');
 
-app.post('/login', function(req, res){
-	authenticate(req.body.username, req.body.password, function(err, user){ 
-	if (user) { 
-		req.session.regenerate(function(){
-			// Store the user's primary key 
-			// in the session store to be retrieved,
-			// or in this case the entire user object 
-			req.session.user = user;
-			//req.session.success = 'Authenticated as ' + user.name 
-			//+ ' click to <a href="/logout">logout</a>. '
-			//+ ' You may now access <a href="/restricted">/restricted</a>.'; 
-			res.redirect('home'); 
-		}); 
-	} else {
-		req.session.error = 'Utente e/o password non validi!'; 
-		res.redirect('index');
-	} 
-	}); 
-}); 
+	// If we recieved a command from a client to start watering lets do so
+  	//socket.on('example-ping', function(data) {
+    //  		console.log("ping");
+  	//});
+
+	button.watch(function (err, value) {
+		if (err) {
+ 			throw err;
+  		}
+  		socket.emit("example-ping",{ 'value': value });
+  		console.log("Button value " + value);
+	});
+});
 
 // FUNCTIONS
 
@@ -126,29 +154,9 @@ function authenticate(name, pass, fn) {
 	var user = users[name]; 
 	// query the db for the given username
 	if (!user) return fn(new Error('Utente non trovato!'));
-
     hash(pass, user.salt, function(err, hash){
-	if (err) return fn(err);
-	if (hash.toString() == user.hash) return fn(null, user);
-	fn(new Error('Password non valida'));
-	})
+		if (err) return fn(err);
+		if (hash.toString() == user.hash) return fn(null, user);
+		fn(new Error('Password non valida'));
+	});
 } 
-
-function light(err, state) {
-	// check the state of the button
-  	// 1 == pressed, 0 == not pressed
-  	if(state == 1) {
-    		// turn LED on
-    		ledXXX.writeSync(1);
-  	} else {
-    		// turn LED off
-    		ledXXX.writeSync(0);
-  	}
-	var request=require('request');
-	var options = {};
-	request.get('http://localhost:3000/home2');
-}
-
-// SERVER START
-app.listen(3000); 
-console.log('Express started on port ' + 3000); 
