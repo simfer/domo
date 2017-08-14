@@ -1,3 +1,8 @@
+@font-face {
+    font-family: "Bangers";
+    src: url(../../assets/fonts/Bangers.ttf) format("truetype");
+}
+
 body {
     background: #46484b;
   }

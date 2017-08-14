@@ -22,6 +22,7 @@ app.use('/node_modules/bootstrap', express.static(__dirname + '/node_modules/boo
 app.use('/node_modules/jquery', express.static(__dirname + '/node_modules/jquery'));
 app.use('/assets/images', express.static(__dirname + '/assets/images'));
 app.use('/assets/styles', express.static(__dirname + '/assets/styles'));
+app.use('/assets/fonts', express.static(__dirname + '/assets/fonts'));
 
 //app.use(cookieParser());
 
