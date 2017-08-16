@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" dir="ltr">
+
+<head>
+    <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8" />
+
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="google" value="notranslate">
+
+    <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap-theme.min.css">
+    <!--<link href="https://fonts.googleapis.com/css?family=Bangers" rel="stylesheet">-->
+
+    <link href="/assets/styles/style.css" rel="stylesheet">
+
+    <title>Domotica - Home</title>
+</head>
+
+<body>
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="#">Domotica - Home</a>
+            </div>
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                    <li class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Azioni <span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a href="#">Il mio profilo</a></li>
+                            <li><a href="#">Impostazioni</a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="/">Logout</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container-fluid -->
+    </nav>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-2 align-center">
+                <text class="theader" dominant-baseline="central" fill="yellow" text-anchor="middle" x="50%" y="50%">Number</text>
+            </div>
+            <div class="col-md-2 align-center">
+                <text class="theader" dominant-baseline="central" fill="yellow" text-anchor="middle" x="50%" y="50%">Direction</text>
+            </div>
+            <div class="col-md-8 align-center">
+                <text class="theader" dominant-baseline="central" fill="yellow" text-anchor="middle" x="50%" y="50%">Status</text>
+            </div>
+        </div>
+        <div class="row">
+            <div id="pinnumber25" class="col-md-2 align-center">
+                <text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="50%" y="50%">25
+                </text>
+            </div>
+            <div id="pindirection25" class="col-md-2 align-center">
+                <text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="50%" y="50%">OUT
+                </text>
+            </div>
+            <div id="pinvalue25s" class="col-md-4 align-center">
+                <div href="" id="csw25" class="cube-switch">
+                    <span class="switch">
+                        <span class="switch-state off">Off</span>
+                        <span class="switch-state on">On</span>
+                    </span>
+                </div>
+            </div>
+            <div id="pinvalue25b" class="col-md-4 align-center">
+                <div id="light-bulb" class="off">
+                    <span class="bulb off"></span>
+                    <span class="bulb on"></span>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div id="pinnumber17" class="col-md-2 align-center">
+                <text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="10%" y="10%">17
+                </text>
+            </div>
+            <div id="pindirection17" class="col-md-2 align-center">
+                <text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="10%" y="10%">IN
+                </text>
+            </div>
+            <div id="pinvalue17" class="col-md-8 align-center">
+                <div id="quiet">
+                    <text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="50%" y="50%">Riposo!
+                    </text>
+                </div>
+                <div id="alarm" class="hidden">
+                    <text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="50%" y="50%">Allarme!
+                    </text>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <script src="/node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="/node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('.cube-switch .switch').click(function (event) {
+                console.log(event.target.parentElement.id);
+                if ($('.cube-switch').hasClass('active')) {
+                    $('.cube-switch').removeClass('active');
+                    $('#light-bulb').attr('class', 'off col-md-6');
+                    setPin(25, "out", 0);
+                } else {
+                    $('.cube-switch').addClass('active');
+                    $('#light-bulb').attr('class', 'on col-md-6');
+                    setPin(25, "out", 1);
+                }
+            });
+            var socket = io.connect(); //('http://localhost:3000/home');
+            socket.on('example-ping', function (data) {
+                console.log("Data received");
+                console.log(data);
+                var v = data.value;
+                if (v == 1) {
+                    $('#alarm').removeClass('hidden');
+                    $('#quiet').addClass('hidden');
+                } else {
+                    $('#quiet').removeClass('hidden');
+                    $('#alarm').addClass('hidden');
+                }
+            });
+
+            checkPin();
+
+            function checkPin() {
+                var settings = {
+                    "url": "/checkpin/25",
+                    "method": "GET"
+                }
+
+                $.ajax(settings).done(function (response, status, xhr) {
+                    if (xhr.status == 200) {
+                        var json = JSON.parse(response);
+                        var pinDirection = json.direction;
+                        var pinValue = json.value;
+                        console.log("pin value " + pinValue);
+
+                        if (pinValue == '1') {
+                            $('.cube-switch').addClass('active');
+                            $('#light-bulb').attr('class', 'on col-md-6');
+                        } else {
+                            $('.cube-switch').removeClass('active');
+                            $('#light-bulb').attr('class', 'off col-md-6');
+                        };
+                    } else {
+                        console.log("ERROR: " + xhr.status);
+                    }
+                });
+            }
+
+            function setPin(n, d, v) {
+                var pin = {
+                    "number": n,
+                    "direction": d,
+                    "value": v
+                };
+                var settings = {
+                    "async": true,
+                    "url": "/setpin",
+                    "method": "POST",
+                    "headers": {
+                        "Authorization": "Bearer 1234",
+                        "content-type": "application/json",
+                        "cache-control": "no-cache"
+                    },
+                    "data": JSON.stringify(pin)
+                }
+                $.ajax(settings).done(function (response, status, xhr) {
+                    if (xhr.status == 200) {
+                        console.log(response);
+                    } else {
+                        console.log("ERROR: " + xhr.status);
+                    }
+                });
+            }
+
+        });
+    </script>
+
+</body>
+
+</html>

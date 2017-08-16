@@ -8,6 +8,7 @@ var hash = require('./pass').hash;
 var routes = require('./routes/index');
 var bodyParser = require("body-parser");
 
+
 if (platform == 'PC') {
 	var GPIO = require("./fakeonoff.js");
 } else {
@@ -19,7 +20,11 @@ if (platform == 'PC') {
 var app = express();
 
 app.locals.pins = [];
-app.locals.pins[25] = {'direction':'out','value':Math.round(Math.random())};
+app.locals.pins[25] = {'direction':'out','edge':'none','value':0};
+app.locals.pins[23] = {'direction':'out','edge':'none','value':0};
+app.locals.pins[17] = {'direction':'in','edge':'both','value':0};
+app.locals.pins[18] = {'direction':'in','edge':'both','value':0};
+
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -53,7 +58,6 @@ app.use(function(req, res, next){
     
 	if (err) res.locals.message ='<div class="alert alert-danger" role="alert"><span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span><span class="sr-only">Errore:</span>' + err + '</div>';
 	if (msg) res.locals.message ='<div class="alert alert-success" role="alert"><span class="glyphicon glyphicon-ok" aria-hidden="true"></span><span class="sr-only">Successo:</span>' + msg + '</div>';
-	console.log(msg);
 	next(); 
 }); 
 
@@ -73,6 +77,11 @@ app.use(function(req, res, next){
 
 app.use('/', routes);
 
+app.get('/readall', function(req, res){ 
+	var out = JSON.stringify(app.locals.pins);
+	res.send(out);
+});
+
 app.get('/checkpin/:pinNumber', function(req, res){ 
 	var pinNumber = req.params.pinNumber;
 	var storedPin = app.locals.pins[pinNumber];
@@ -84,7 +93,7 @@ app.get('/checkpin/:pinNumber', function(req, res){
 	//physically read the status of the pin
     	var pinValue = pin.readSync();
 	
-	//if for some reason the status has changed I update it
+	//if for some reason the status has changed I update it in the global array
 	app.locals.pins[pinNumber].value = pinValue;
 
 	storedPin = app.locals.pins[pinNumber];
@@ -100,12 +109,10 @@ app.post('/setpin', function(req, res){
 	var pin = new GPIO(pinNumber, pinDirection);
     	pin.writeSync(pinValue);
 	var out = app.locals.pins[pinNumber];
-	console.log(out);
 	res.send(JSON.stringify(out));
 }); 
 
 app.post('/login', function(req, res){
-	//console.log(req);
 	var username = req.body.username;
 	var password = req.body.password;
 
@@ -140,20 +147,24 @@ var io = require('socket.io').listen(server);
 
 // Web Socket Connection
 io.on('connection', function (socket) {
-	var button = new GPIO(17, 'in', 'both');
 
-	// If we recieved a command from a client to start watering lets do so
-  	//socket.on('example-ping', function(data) {
-    //  		console.log("ping");
-  	//});
+	var buttons = [];
 
-	button.watch(function (err, value) {
-		if (err) {
- 			throw err;
-  		}
-  		socket.emit("example-ping",{ 'value': value });
-  		console.log("Button value " + value);
-	});
+	for (i = 0; i <= 27; i++) {
+		if (app.locals.pins[i]) {
+			var x = app.locals.pins[i];
+			if (x.direction == "in") {
+				(function(i){
+					var dest = 'ping'+i;
+					buttons[i] = new GPIO(i, x.direction, x.edge);
+					buttons[i].watch(function (err, value) {
+				 		if (err) throw err;
+						 socket.emit(dest,{ 'value': value });
+					});
+				 })(i);
+			}
+		}
+	}
 });
 
 // FUNCTIONS
@@ -169,7 +180,6 @@ hash('Admin123', function(err, salt, hash){
 
 // Authenticate using our plain-object database of doom!
 function authenticate(name, pass, fn) { 
-	//if (!module.parent) console.log('authenticating %s:%s', name, pass);
 	var user = users[name]; 
 	// query the db for the given username
 	if (!user) return fn(new Error('Utente non trovato!'));
