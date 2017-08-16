@@ -43,9 +43,9 @@ app.use('/assets/fonts', express.static(__dirname + '/assets/fonts'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(session({
-    secret:'secret',
-    resave: false,
-    saveUninitialized: false
+    secret:'2C44-4D44-WppQ38S',
+    resave: true,
+    saveUninitialized: true
 }));
 
 
@@ -115,7 +115,7 @@ app.post('/setpin', function(req, res){
 app.post('/login', function(req, res){
 	var username = req.body.username;
 	var password = req.body.password;
-
+	req.session.authenticated = false;
 	authenticate(username, password, function(err, user){ 
 		if (user) { 
 			req.session.regenerate(function(){
@@ -123,6 +123,7 @@ app.post('/login', function(req, res){
 				// in the session store to be retrieved,
 				// or in this case the entire user object 
 				req.session.user = user;
+				req.session.authenticated = true;
 				res.redirect('home'); 
 			}); 
 		} else {
