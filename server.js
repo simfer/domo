@@ -1,4 +1,4 @@
-const platform = "PC"; // {PC,RASP}
+const platform = "PC"; // {PC = emulated mode, RASP = Raspberry mode}
 
 var express = require('express');
 var session = require('express-session');
@@ -9,14 +9,16 @@ var ejs = require('ejs');
 var routes = require('./routes/index');
 var bodyParser = require("body-parser");
 
-
+// if I've enabled the emulated mode I use the fake GPIO module else
+// I use the real "onoff" library
 if (platform == 'PC') {
 	var GPIO = require("./fakeonoff.js");
 } else {
 	var GPIO = require('onoff').Gpio;	
 }
 
-//var cookieParser = require('cookie-parser');
+var users = { admin: { name: 'admin' }};
+var adminPassword = 'Admin123'; // this should be managed differently
 
 var app = express();
 
@@ -34,24 +36,29 @@ app.locals.language.inputTableTitle = "INPUT Ports";
 app.locals.language.outputTableTitle = "OUTPUT Ports";
 app.locals.language.msgInEditTitle = "INPUT Port";
 app.locals.language.msgOutEditTitle = "OUTPUT Port";
-
 app.locals.language.msgAdd = "Add";
 app.locals.language.msgActive = "Active";
 app.locals.language.msgGPIO = "GPIO";
 app.locals.language.msgEdge = "EDGE";
 app.locals.language.msgDirection = "Direction";
 app.locals.language.msgDescription = "Description";
+app.locals.language.msgValue = "Value";
 app.locals.language.msgStatus = "Status";
 app.locals.language.msgActions = "Actions";
 app.locals.language.msgOn = "ON";
 app.locals.language.msgOff = "OFF";
 app.locals.language.msgOk = "OK!";
 app.locals.language.msgAlarm = "ALARM!";
+app.locals.language.msgFormCancel = "Cancel";
+app.locals.language.msgFormSave = "Save";
+
 
 // data is transformed into an array in order to better work with it
-app.locals.gpios = [];
-app.locals.board = [];
+app.locals.gpios = []; // the array of the GPIO details
+app.locals.board = []; // the array of the physical GPIO objects on the Raspberry board
 
+// parsing the settings to populate the array of the GPIO details and
+// doing a setup for the GPIO pins on the board
 settings.forEach(function(element) {
 	app.locals.gpios[element.gpio] = {};
 	app.locals.gpios[element.gpio].active = element.active;
@@ -74,11 +81,10 @@ settings.forEach(function(element) {
 	}
 }, this);
 
-//console.log(app.locals.board);
-
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 
+// MIDDLEWARE
 app.use('/static', express.static('public'));
 app.use('/node_modules/bootstrap', express.static(__dirname + '/node_modules/bootstrap'));
 app.use('/node_modules/jquery', express.static(__dirname + '/node_modules/jquery'));
@@ -87,7 +93,6 @@ app.use('/assets/images', express.static(__dirname + '/assets/images'));
 app.use('/assets/styles', express.static(__dirname + '/assets/styles'));
 app.use('/assets/fonts', express.static(__dirname + '/assets/fonts'));
 
-// MIDDLEWARE
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(session({
@@ -108,14 +113,18 @@ app.use(function(req, res, next){
 	next(); 
 }); 
 
+app.use(logger);
 app.use('/', routes);
 
 // API server
+
+// reads all the GPIOs from the app local array
 app.get('/readall', function(req, res){ 
 	var out = JSON.stringify(app.locals.gpios); //maybe I could stringify settings
 	res.send(out);
 });
 
+// reads a single GPIO from the app local array
 app.get('/readgpio/:gpio', function(req, res){ 
 	var gpioNumber = req.params.gpio;
 	var localGpio = app.locals.gpios[gpioNumber];
@@ -134,12 +143,15 @@ app.get('/readgpio/:gpio', function(req, res){
 	res.send(JSON.stringify(localGpio));	
 });
 
+// removes a GPIO from the app local array
 app.delete('/removegpio/:gpio', function(req, res){ 
 	var gpioNumber = req.params.gpio;
 	app.locals.gpios[gpioNumber] = null;
 	res.send("GPIO " + gpioNumber + " removed!");	
 });
 
+
+/// sets a single GPIO from the local array
 app.post('/setgpio', function(req, res){
 	var gpioNumber = req.body.gpio;
 	var gpioActive = req.body.active;
@@ -165,18 +177,7 @@ app.post('/setgpio', function(req, res){
 	res.send(JSON.stringify(out));
 }); 
 
-app.post('/setpin', function(req, res){
-	var pinNumber = req.body.number;
-	var pinDirection = req.body.direction;
-	var pinValue = req.body.value;
-	app.locals.gpios[pinNumber].direction = pinDirection;
-	app.locals.gpios[pinNumber].value = pinValue;
-	var pin = new GPIO(pinNumber, pinDirection);
-    	pin.writeSync(pinValue);
-	var out = app.locals.gpios[pinNumber];
-	res.send(JSON.stringify(out));
-}); 
-
+// login 
 app.post('/login', function(req, res){
 	var username = req.body.username;
 	var password = req.body.password;
@@ -192,12 +193,13 @@ app.post('/login', function(req, res){
 				res.redirect('home'); 
 			}); 
 		} else {
-			req.session.error = 'Utente e/o password non validi!'; 
+			req.session.error = 'Invalid user and/or password!'; 
 			res.redirect('/');
 		} 
 	}); 
 }); 
 
+// logout
 app.get('/logout', function(req, res){
 	// destroy the user's session to log them out 
 	// will be re-created next request
@@ -205,6 +207,21 @@ app.get('/logout', function(req, res){
 		res.redirect('/');
 	}); 
 }); 
+
+
+/* app.post('/setpin', function(req, res){
+	var pinNumber = req.body.number;
+	var pinDirection = req.body.direction;
+	var pinValue = req.body.value;
+	app.locals.gpios[pinNumber].direction = pinDirection;
+	app.locals.gpios[pinNumber].value = pinValue;
+	var pin = new GPIO(pinNumber, pinDirection);
+    	pin.writeSync(pinValue);
+	var out = app.locals.gpios[pinNumber];
+	res.send(JSON.stringify(out));
+});*/ 
+
+
 
 var server = app.listen(3000);
 console.log('Express started on port ' + 3000); 
@@ -234,8 +251,7 @@ io.on('connection', function (socket) {
 // FUNCTIONS
 
 // dummy database 
-var users = { admin: { name: 'admin' }};
-hash('Admin123', function(err, salt, hash){ 
+hash(adminPassword, function(err, salt, hash){ 
 	if (err) throw err; 
 	// store the salt & hash in the "db"
 	users.admin.salt = salt; 
@@ -246,10 +262,16 @@ hash('Admin123', function(err, salt, hash){
 function authenticate(name, pass, fn) { 
 	var user = users[name]; 
 	// query the db for the given username
-	if (!user) return fn(new Error('Utente non trovato!'));
+	if (!user) return fn(new Error('User not found!'));
     hash(pass, user.salt, function(err, hash){
 		if (err) return fn(err);
 		if (hash.toString() == user.hash) return fn(null, user);
-		fn(new Error('Password non valida'));
+		fn(new Error('Invalid password!'));
 	});
 } 
+
+function logger(req,res,next){
+  console.log(new Date(), req.method, req.url);
+  next();
+}
+

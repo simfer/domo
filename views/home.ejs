@@ -51,31 +51,25 @@
                 <div class="modal-body">
                     <form>
                         <div class="form-group">
-                            <label for="frmInGpio" class="form-control-label">GPIO:</label>
+                            <label for="frmInGpio" class="form-control-label"><%-locals.language.msgGPIO%>:</label>
                             <select id="frmInGpio" class="form-control">
-                        <option>02</option><option>03</option><option>04</option><option>05</option><option>06</option>
-                        <option>07</option><option>08</option><option>09</option><option>10</option><option>11</option>
-                        <option>12</option><option>13</option><option>14</option><option>15</option><option>16</option>
-                        <option>17</option><option>18</option><option>19</option><option>20</option><option>21</option>
-                        <option>22</option><option>23</option><option>24</option><option>25</option><option>26</option>
-                        <option>27</option>
                     </select>
                         </div>
                         <div class="form-group">
-                            <label for="frmInEdge" class="form-control-label">EDGE:</label>
+                            <label for="frmInEdge" class="form-control-label"><%-locals.language.msgEdge%>:</label>
                             <select id="frmInEdge" class="form-control">
                         <option>none</option><option>falling</option><option>raising</option><option>both</option>
                     </select>
                         </div>
                         <div class="form-group">
-                            <label for="frmInDescription" class="form-control-label">Description:</label>
+                            <label for="frmInDescription" class="form-control-label"><%-locals.language.msgDescription%>:</label>
                             <input id="frmInDescription" class="form-control">
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button id="btnSaveInput" type="button" class="btn btn-primary" data-dismiss="modal">Save</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><%-locals.language.msgFormCancel%></button>
+                    <button id="btnSaveInput" type="button" class="btn btn-primary" data-dismiss="modal"><%-locals.language.msgFormSave%></button>
                 </div>
             </div>
         </div>
@@ -93,22 +87,16 @@
                 <div class="modal-body">
                     <form>
                         <div class="form-group">
-                            <label for="frmOutGpio" class="form-control-label">GPIO:</label>
+                            <label for="frmOutGpio" class="form-control-label"><%-locals.language.msgGPIO%>:</label>
                             <select id="frmOutGpio" class="form-control">
-                                <option>02</option><option>03</option><option>04</option><option>05</option><option>06</option>
-                                <option>07</option><option>08</option><option>09</option><option>10</option><option>11</option>
-                                <option>12</option><option>13</option><option>14</option><option>15</option><option>16</option>
-                                <option>17</option><option>18</option><option>19</option><option>20</option><option>21</option>
-                                <option>22</option><option>23</option><option>24</option><option>25</option><option>26</option>
-                                <option>27</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="frmOutDescription" class="form-control-label">Description:</label>
+                            <label for="frmOutDescription" class="form-control-label"><%-locals.language.msgDescription%>:</label>
                             <input id="frmOutDescription" class="form-control">
                         </div>
                         <div class="form-group">
-                            <label for="frmOutValue" class="form-control-label">Value:</label>
+                            <label for="frmOutValue" class="form-control-label"><%-locals.language.msgValue%>:</label>
                             <select id="frmOutValue" class="form-control">
                                     <option>OFF</option><option>ON</option>
                                 </select>
@@ -116,8 +104,8 @@
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button id="btnSaveOutput" type="button" class="btn btn-primary" data-dismiss="modal">Save</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><%-locals.language.msgFormCancel%></button>
+                    <button id="btnSaveOutput" type="button" class="btn btn-primary" data-dismiss="modal"><%-locals.language.msgFormSave%></button>
                 </div>
             </div>
         </div>
