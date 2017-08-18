@@ -9,7 +9,6 @@
 
     <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap-theme.min.css">
-    <!--<link href="https://fonts.googleapis.com/css?family=Bangers" rel="stylesheet">-->
 
     <link href="/assets/styles/style.css" rel="stylesheet">
 
@@ -25,10 +24,10 @@
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
                 <ul class="nav navbar-nav navbar-right">
                     <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Azioni <span class="caret"></span></a>
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Menu <span class="caret"></span></a>
                         <ul class="dropdown-menu">
-                            <li><a href="#">Il mio profilo</a></li>
-                            <li><a href="#">Impostazioni</a></li>
+                            <li><a href="#">My profile</a></li>
+                            <li><a href="#">Settings</a></li>
                             <li role="separator" class="divider"></li>
                             <li><a href="/">Logout</a></li>
                         </ul>
@@ -39,6 +38,91 @@
         </div>
         <!-- /.container-fluid -->
     </nav>
+
+    <!-- Edit form for INPUT -->
+    <div class="modal fade" id="frmInput" tabindex="-1" role="dialog" aria-labelledby="frmInputLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="frmInputLabel">
+                        <%-locals.language.msgInEditTitle%>
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="frmInGpio" class="form-control-label">GPIO:</label>
+                            <select id="frmInGpio" class="form-control">
+                        <option>02</option><option>03</option><option>04</option><option>05</option><option>06</option>
+                        <option>07</option><option>08</option><option>09</option><option>10</option><option>11</option>
+                        <option>12</option><option>13</option><option>14</option><option>15</option><option>16</option>
+                        <option>17</option><option>18</option><option>19</option><option>20</option><option>21</option>
+                        <option>22</option><option>23</option><option>24</option><option>25</option><option>26</option>
+                        <option>27</option>
+                    </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="frmInEdge" class="form-control-label">EDGE:</label>
+                            <select id="frmInEdge" class="form-control">
+                        <option>none</option><option>falling</option><option>raising</option><option>both</option>
+                    </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="frmInDescription" class="form-control-label">Description:</label>
+                            <input id="frmInDescription" class="form-control">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button id="btnSaveInput" type="button" class="btn btn-primary" data-dismiss="modal">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit form for OUTPUT -->
+    <div class="modal fade" id="frmOutput" tabindex="-1" role="dialog" aria-labelledby="frmOutputLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="frmOutputLabel">
+                        <%-locals.language.msgOutEditTitle%>
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="frmOutGpio" class="form-control-label">GPIO:</label>
+                            <select id="frmOutGpio" class="form-control">
+                                <option>02</option><option>03</option><option>04</option><option>05</option><option>06</option>
+                                <option>07</option><option>08</option><option>09</option><option>10</option><option>11</option>
+                                <option>12</option><option>13</option><option>14</option><option>15</option><option>16</option>
+                                <option>17</option><option>18</option><option>19</option><option>20</option><option>21</option>
+                                <option>22</option><option>23</option><option>24</option><option>25</option><option>26</option>
+                                <option>27</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="frmOutDescription" class="form-control-label">Description:</label>
+                            <input id="frmOutDescription" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="frmOutValue" class="form-control-label">Value:</label>
+                            <select id="frmOutValue" class="form-control">
+                                    <option>OFF</option><option>ON</option>
+                                </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button id="btnSaveOutput" type="button" class="btn btn-primary" data-dismiss="modal">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="mainTable" class="container">
     </div>
 
@@ -46,106 +130,242 @@
     <script src="/node_modules/jquery/dist/jquery.min.js"></script>
     <script src="/node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="../node_modules/ejs/ejs.js"></script>
     <script>
         $(document).ready(function () {
             var pins = [];
 
-            generateTable();
-            readAll();
+            $('#frmInput').modal({
+                keyboard: true,
+                backdrop: "static",
+                show: false
+            }).on('show.bs.modal', function (event) {
+                if (event.relatedTarget) {
+                    var senderId = (event.relatedTarget ? event.relatedTarget.id : "");
+                    var rowId = (event.relatedTarget.id !== "inPortsAdd" ? senderId.replace('edit', '') : "");
 
-            function generateTable() {
-                var mainTableHeader = '<div class="row row-m-b-head">' +
-                    '<div class="col-md-2 align-center">' +
-                    '<text class="mainTableHeader" dominant-baseline="central" fill="yellow" text-anchor="middle" x="50%" y="50%">Number</text>' +
-                    '</div>' +
-                    '<div class="col-md-2 align-center">' +
-                    '<text class="mainTableHeader" dominant-baseline="central" fill="yellow" text-anchor="middle" x="50%" y="50%">Direction</text>' +
-                    '</div>' +
-                    '<div class="col-md-8 align-center">' +
-                    '<text class="mainTableHeader" dominant-baseline="central" fill="yellow" text-anchor="middle" x="50%" y="50%">Status</text>' +
-                    '</div>' +
-                    '</div>';
+                    if (rowId) { // edit mode
+                        var portsOptionHtml = '';
+                        for (i = 2; i <= 27; i++) {
+                            portsOptionHtml += '<option>' + i + '</option>';
+                        }
+                        $('#frmInGpio').html(portsOptionHtml);
 
+                        $('#frmInGpio').val(rowId);
+                        $('#frmInGpio').prop('disabled', true);
+                        var row = $(event.relatedTarget).closest('tr');
+                        var columns = row.find('td');
+
+                        $('#frmInEdge').val(columns[2].textContent);
+                        $('#frmInDescription').val(columns[3].textContent);
+                    } else { // add mode
+                        $('#frmInGpio').prop('disabled', false);
+                        $('#frmInEdge').val('none');
+                        $('#frmInDescription').val('');
+                        readAll(function (pins) {
+                            var portsOptionHtml = '';
+                            for (i = 2; i <= 27; i++) {
+                                if (!pins[i]) {
+                                    portsOptionHtml += '<option>' + i + '</option>';
+                                }
+                            }
+                            $('#frmInGpio').html(portsOptionHtml);
+                        });
+                    }
+                }
+            });
+
+            $('#frmOutput').modal({
+                keyboard: true,
+                backdrop: "static",
+                show: false
+            }).on('show.bs.modal', function (event) {
+                if (event.relatedTarget) {
+                    var senderId = (event.relatedTarget ? event.relatedTarget.id : "");
+                    var rowId = (event.relatedTarget.id !== "outPortsAdd" ? senderId.replace('edit', '') : "");
+
+                    console.log(senderId);
+                    console.log(rowId);
+                    if (rowId) { // edit mode
+                        var portsOptionHtml = '';
+                        for (i = 2; i <= 27; i++) {
+                            portsOptionHtml += '<option>' + i + '</option>';
+                        }
+                        $('#frmOutGpio').html(portsOptionHtml);
+                        $('#frmOutGpio').val(rowId);
+                        $('#frmOutGpio').prop('disabled', true);
+                        var row = $(event.relatedTarget).closest('tr');
+                        console.log(row);
+                        var columns = row.find('td');
+                        console.log(columns);
+
+                        $('#frmOutDescription').val(columns[1].textContent);
+                        $('#frmOutValue').val($(columns[2].children[0]).val());
+                    } else { // add mode
+                        $('#frmOutGpio').prop('disabled', false);
+                        readAll(function (pins) {
+                            var portsOptionHtml = '';
+                            for (i = 2; i <= 27; i++) {
+                                if (!pins[i]) {
+                                    portsOptionHtml += '<option>' + i + '</option>';
+                                }
+                            }
+                            $('#frmOutGpio').html(portsOptionHtml);
+                        });
+                    }
+                }
+
+            });
+
+            $('#btnSaveInput').click(function (event) {
+                var result = {};
+                result.gpio = $('#frmInGpio').val();
+                result.edge = $('#frmInEdge').val();
+                result.direction = 'in';
+                result.description = $('#frmInDescription').val();
+                result.value = -1;
+
+                setgpio(result);
+            });
+
+            $('#btnSaveOutput').click(function (event) {
+                var result = {};
+                result.gpio = $('#frmOutGpio').val();
+                result.edge = 'none';
+                result.direction = 'out';
+                result.description = $('#frmOutDescription').val();
+                result.value = 0;
+
+                console.log(result);
+
+                setgpio(result);
+
+            });
+
+            readAll(function (pins) {
+                generateTable(pins);
+            });
+
+            function generateTable(gp) {
+                console.log(gp);
                 var mainTableBody = '';
-                for (i = 0; i <= 27; i++) {
-                    if (pins[i]) {
-                        var pin = pins[i];
-                        if (pin.direction == 'out') {
-                            mainTableBody += '<div class="row row-m-b">' +
-                                '<div id="pinnumber' + i + '" class="col-md-2 align-center">' +
-                                '<text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="50%" y="50%">' + i + '</text>' +
-                                '</div>' +
-                                '<div id="pindirection' + i + '" class="col-md-2 align-center">' +
-                                '<text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="50%" y="50%">' + pin.direction + '</text>' +
-                                '</div>' +
-                                '<div id="pinvalue' + i + '" class="col-md-8 align-center">' +
-                                '<button id="pinButton' + i + '" type="button" class="btn btn-default btn-xs btnOut">' + outStatus(pin.value) + '</button>' +
-                                '</div>' +
-                                '</div>';
+                var mainTableInputHtml = '<div class="panel panel-primary">' +
+                    '<div class="panel-heading align-center"><%-locals.language.inputTableTitle%></div>' +
+                    '<div class="panel-body">' +
+                    '<button id="inPortsAdd" type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#frmInput">' +
+                    '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span><%-locals.language.msgAdd%></button>' +
+                    '</div>' +
+                    '<table class="table table-bordered">' +
+                    '<thead>' +
+                    '<tr>' +
+                    '<th><%-locals.language.msgActive%></th><th><%-locals.language.msgGPIO%></th><th><%-locals.language.msgEdge%>' +
+                    '</th><th><%-locals.language.msgDescription%></th><th><%-locals.language.msgStatus%></th><th><%-locals.language.msgActions%></th>' +
+                    '</tr></thead><tbody>';
+
+
+                var mainTableOutputHtml = '<div class="panel panel-primary">' +
+                    '<div class="panel-heading align-center"><%-locals.language.outputTableTitle%></div>' +
+                    '<div class="panel-body">' +
+                    '<button id="outPortsAdd" type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#frmOutput">' +
+                    '<span class="glyphicon glyphicon-plus" aria-hidden="true"></span><%-locals.language.msgAdd%></button>' +
+                    '</div>' +
+                    '<table class="table table-bordered">' +
+                    '<thead>' +
+                    '<tr>' +
+                    '<th><%-locals.language.msgGPIO%></th><th><%-locals.language.msgDescription%></th>' +
+                    '<th><%-locals.language.msgStatus%></th><th><%-locals.language.msgActions%></th>' +
+                    '</tr></thead><tbody>';
+
+
+                for (i = 2; i <= 27; i++) {
+                    if (gp[i]) {
+                        var pin = gp[i];
+                        if (pin.direction == 'in') {
+                            mainTableInputHtml += '<tr>' +
+                                '<td>' +
+                                '<input class="ios8-switch ios8-switch-sm" id="zone' + i + '" type="checkbox" checked/>' +
+                                '<label for="zone' + i + '">&nbsp;</label>' +
+                                '</td>' +
+                                '<td>' + i + '</td>' +
+                                '<td>' + pin.edge + '</td>' +
+                                '<td>' + pin.description + '</td>' +
+                                '<td style="text-align:center">' +
+                                '<input class="btn ' + ((pin.value == 0) ? "btn-success" : "btn-danger") + ' btnStatusInput disabled" type="button"' +
+                                'value="' + ((pin.value == 0) ? "<%-locals.language.msgOk%>" : "<%-locals.language.msgAlarm%>") + '"/>' +
+                                '</td>' +
+                                '<td style="text-align:center">' +
+                                '<button id="edit' + i + '" type="button" class="btn btn-warning btn-sm btnEdit" data-toggle="modal" data-target="#frmInput">' +
+                                '<span class="glyphicon glyphicon-pencil" aria-hidden="true"></span>' +
+                                '</button>&nbsp;' +
+                                '<button id="delete' + i + '" type="button" class="btn btn-warning btn-sm btnDelete">' +
+                                '<span class="glyphicon glyphicon-trash" aria-hidden="true"></span>' +
+                                '</button>' +
+                                '</td>' +
+                                '</tr>';
                         } else {
-                            mainTableBody += '<div class="row row-m-b">' +
-                                '<div id="pinnumber' + i + '" class="col-md-2 align-center">' +
-                                '<text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="50%" y="50%">' + i + '</text>' +
-                                '</div>' +
-                                '<div id="pindirection' + i + '" class="col-md-2 align-center">' +
-                                '<text class="word" dominant-baseline="central" fill="white" text-anchor="middle" x="50%" y="50%">' + pin.direction + '</text>' +
-                                '</div>' +
-                                '<div id="pinvalue' + i + '" class="col-md-8 align-center">' +
-                                '<text id="pintext' + i + '" class="inOK" dominant-baseline="central" fill="green" text-anchor="middle" x="10%" y="10%">' + inStatus(pin.value) + '</text>' +
-                                '</div>' +
-                                '</div>';
+                            mainTableOutputHtml += '<tr>' +
+                                '<td>' + i + '</td>' +
+                                '<td>' + pin.description + '</td>' +
+                                '<td style="text-align:center">' +
+                                '<input class="btn ' + ((pin.value == 0) ? "btn-default" : "btn-success") +
+                                ' btnStatusOutput" type="button" value="' + ((pin.value == 0) ? "<%-locals.language.msgOff%>" : "<%-locals.language.msgOn%>") + '"/>' +
+                                '</td>' +
+                                '<td style="text-align:center">' +
+                                '<button id="edit' + i + '" type="button" class="btn btn-warning btn-sm btnEdit" data-toggle="modal" data-target="#frmOutput">' +
+                                '<span class="glyphicon glyphicon-pencil" aria-hidden="true"></span>' +
+                                '</button>&nbsp;' +
+                                '<button id="delete' + i + '" type="button" class="btn btn-warning btn-sm btnDelete">' +
+                                '<span class="glyphicon glyphicon-trash" aria-hidden="true"></span>' +
+                                '</button>' +
+                                '</td>' +
+                                '</tr>';
                         }
                     }
                 }
-                var mainTableHTML = mainTableHeader + mainTableBody;
+                mainTableInputHtml += '</tbody></table></div>';
+                mainTableOutputHtml += '</tbody></table></div>';
+                mainTableBody = mainTableInputHtml + '<hr>' + mainTableOutputHtml;
 
-                $('#mainTable').html(mainTableHTML);
+                $('#mainTable').html(mainTableBody);
 
-                $('.btnOut').click(function (event) {
+                $('.btnDelete').click(function (event) {
+                    var button = $(this);
+                    var rowID = button.prop('id').replace('delete', '');
+                    removegpio(rowID);
+                });
+
+                $('.btnStatusOutput').click(function (event) {
                     var buttonID = event.target.id;
-                    var pin = buttonID.replace('pinButton', '');
-                    if (pins[pin].value == 0) {
+                    if ($(event.target).hasClass('btn-default')) {
                         $(event.target).removeClass('btn-default');
                         $(event.target).addClass('btn-success');
-                        $(event.target).html('ON');
-                        pins[pin].value = 1;
-                        setPin(pin,pins[pin].direction,pins[pin].value);
-
+                        $(event.target).val('ON');
                     } else {
                         $(event.target).removeClass('btn-success');
                         $(event.target).addClass('btn-default');
-                        $(event.target).html('OFF');
-                        pins[pin].value = 0;
-                        setPin(pin,pins[pin].direction,pins[pin].value);
+                        $(event.target).val('OFF');
                     }
                 });
-                
-                var socket = io.connect();
-                
-                for (i = 0; i <= 27; i++) {
-                    if((pins[i]) && (pins[i].direction == 'in')) {
-                        (function(i){
-                            socket.on('ping'+i, function (data) {
-                                var v = data.value;
-                                var pin = i;
-                                pins[pin].value = v;
-    
-                                if (v == 1) {
-                                    $('#pintext'+pin).html("ALARM!");
-                                    $('#pintext'+pin).removeClass('inOK');
-                                    $('#pintext'+pin).addClass('inAlarm');
-                                } else {
-                                    $('#pintext'+pin).html("OK!");
-                                    $('#pintext'+pin).addClass('inOK');
-                                    $('#pintext'+pin).removeClass('inAlarm');
-                                }
-                            });
-                            })(i);
+
+                $('.ios8-switch').click(function (event) {
+                    var button = $(this);
+                    var rowID = button.prop('id').replace('zone', '');
+                    var checked = button.prop('checked');
+                    var row = $(this).closest('tr');
+                    var columns = row.find('td');
+                    if (!checked) {
+                        for (i = 1; i < columns.length; i++) {
+                            $(columns[i]).addClass('disabledCell');
+                        }
+                    } else {
+                        for (i = 1; i < columns.length; i++) {
+                            $(columns[i]).removeClass('disabledCell');
+                        }
                     }
-                }                
+                });
             }
 
-            function readAll() {
+            function readAll(cb) {
                 var settings = {
                     "url": "/readall",
                     "method": "GET"
@@ -155,14 +375,60 @@
                     if (xhr.status == 200) {
                         var json = JSON.parse(response);
                         pins = json;
-                        generateTable();
-
+                        cb(pins);
                     } else {
                         console.log("ERROR: " + xhr.status);
                     }
                 });
 
             }
+
+            function setgpio(p) {
+                var data = {
+                    "gpio": p.gpio,
+                    "active": 1,
+                    "direction": p.direction,
+                    "edge": p.edge,
+                    "description": p.description,
+                    "value": p.value
+                };
+                var settings = {
+                    "async": true,
+                    "url": "/setgpio",
+                    "method": "POST",
+                    "headers": {
+                        "Authorization": "Bearer 1234",
+                        "content-type": "application/json",
+                        "cache-control": "no-cache"
+                    },
+                    "data": JSON.stringify(data)
+                }
+                $.ajax(settings).done(function (response, status, xhr) {
+                    if (xhr.status == 200) {
+                        location.reload();
+                        console.log(response);
+                    } else {
+                        console.log("ERROR: " + xhr.status);
+                    }
+                });
+            }
+
+            function removegpio(gp) {
+                var settings = {
+                    "url": "/removegpio/" + gp,
+                    "method": "DELETE"
+                }
+
+                $.ajax(settings).done(function (response, status, xhr) {
+                    if (xhr.status == 200) {
+                        location.reload();
+                        console.log(response);
+                    } else {
+                        console.log("ERROR: " + xhr.status);
+                    }
+                });
+            }
+
 
             function setPin(n, d, v) {
                 var pin = {
@@ -188,14 +454,6 @@
                         console.log("ERROR: " + xhr.status);
                     }
                 });
-            }
-
-            function inStatus(st) {
-                return ((st == 0) ? 'OK!' : 'ALARM!');
-            }
-
-            function outStatus(st) {
-                return ((st == 0) ? 'OFF' : 'ON');
             }
         });
     </script>

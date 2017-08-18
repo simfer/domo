@@ -23,4 +23,12 @@ module.exports = function GPIO(pin,direction,edge) {
         this.value = v;
     }
 
+    this.unwatchAll = function() {
+        this.watch(null);
+        console.log("unwatchAll");
+    }
+
+    this.unexport = function() {
+        console.log("unexport");
+    }
 }

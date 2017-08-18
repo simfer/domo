@@ -4,6 +4,7 @@ var express = require('express');
 var session = require('express-session');
 var socket_io = require('socket.io');
 var hash = require('./pass').hash;
+var ejs = require('ejs');
 
 var routes = require('./routes/index');
 var bodyParser = require("body-parser");
@@ -19,12 +20,61 @@ if (platform == 'PC') {
 
 var app = express();
 
-app.locals.pins = [];
-app.locals.pins[25] = {'direction':'out','edge':'none','value':0};
-app.locals.pins[23] = {'direction':'out','edge':'none','value':0};
-app.locals.pins[17] = {'direction':'in','edge':'both','value':0};
-app.locals.pins[18] = {'direction':'in','edge':'both','value':0};
+// this is the variable hosting initial data. These data could come from a DB
+var settings = [
+	{'gpio':17,'active':1,'direction':'in','edge':'both','value':0,'description':'Garage door'},
+	{'gpio':18,'active':0,'direction':'in','edge':'both','value':0,'description':'Main gate'},
+	{'gpio':23,'active':1,'direction':'out','edge':'none','value':0,'description':'Garage light'},
+	{'gpio':25,'active':1,'direction':'out','edge':'none','value':1,'description':'Outside lights'}
+];
 
+// LANGUAGE
+app.locals.language = {};
+app.locals.language.inputTableTitle = "INPUT Ports";
+app.locals.language.outputTableTitle = "OUTPUT Ports";
+app.locals.language.msgInEditTitle = "INPUT Port";
+app.locals.language.msgOutEditTitle = "OUTPUT Port";
+
+app.locals.language.msgAdd = "Add";
+app.locals.language.msgActive = "Active";
+app.locals.language.msgGPIO = "GPIO";
+app.locals.language.msgEdge = "EDGE";
+app.locals.language.msgDirection = "Direction";
+app.locals.language.msgDescription = "Description";
+app.locals.language.msgStatus = "Status";
+app.locals.language.msgActions = "Actions";
+app.locals.language.msgOn = "ON";
+app.locals.language.msgOff = "OFF";
+app.locals.language.msgOk = "OK!";
+app.locals.language.msgAlarm = "ALARM!";
+
+// data is transformed into an array in order to better work with it
+app.locals.gpios = [];
+app.locals.board = [];
+
+settings.forEach(function(element) {
+	app.locals.gpios[element.gpio] = {};
+	app.locals.gpios[element.gpio].active = element.active;
+	app.locals.gpios[element.gpio].direction = element.direction;
+	app.locals.gpios[element.gpio].edge = element.edge;
+	app.locals.gpios[element.gpio].value = element.value;
+	app.locals.gpios[element.gpio].description = element.description;
+
+	if(element.active == 1) {
+		app.locals.board[element.gpio] = new GPIO(element.gpio, element.direction, element.edge);
+		if(element.direction == 'out') {
+			console.log("Created OUTPUT pin [" + element.gpio + "]");
+			console.log("	Value for pin [" + element.gpio + "] set to [" + element.value + "]");
+			app.locals.board[element.gpio].writeSync(element.value);
+		} else {
+			console.log("Created INPUT pin [" + element.gpio + "]");
+			console.log("	Direction for pin [" + element.gpio + "] set to [" + element.direction + "]");
+			console.log("	Edge for pin [" + element.gpio + "] set to [" + element.edge + "]");
+		}
+	}
+}, this);
+
+//console.log(app.locals.board);
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -32,12 +82,10 @@ app.set('view engine', 'ejs');
 app.use('/static', express.static('public'));
 app.use('/node_modules/bootstrap', express.static(__dirname + '/node_modules/bootstrap'));
 app.use('/node_modules/jquery', express.static(__dirname + '/node_modules/jquery'));
+app.use('/node_modules/ejs', express.static(__dirname + '/node_modules/ejs'));
 app.use('/assets/images', express.static(__dirname + '/assets/images'));
 app.use('/assets/styles', express.static(__dirname + '/assets/styles'));
 app.use('/assets/fonts', express.static(__dirname + '/assets/fonts'));
-
-//app.use(cookieParser());
-
 
 // MIDDLEWARE
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -47,7 +95,6 @@ app.use(session({
     resave: true,
     saveUninitialized: true
 }));
-
 
 app.use(function(req, res, next){ 
 	var err = req.session.error;
@@ -61,54 +108,72 @@ app.use(function(req, res, next){
 	next(); 
 }); 
 
-//app.use(function(req, res, next) {
-//	var err = new Error('Not Found');
-//	err.status = 404;
-//	next(err);
-//});
-
-//app.use(function(err, req, res, next) {
-//		res.status(err.status || 500);
-//		res.render('error', {
-//		message: err.message,
-//		error: err
-//	});
-//});
-
 app.use('/', routes);
 
+// API server
 app.get('/readall', function(req, res){ 
-	var out = JSON.stringify(app.locals.pins);
+	var out = JSON.stringify(app.locals.gpios); //maybe I could stringify settings
 	res.send(out);
 });
 
-app.get('/checkpin/:pinNumber', function(req, res){ 
-	var pinNumber = req.params.pinNumber;
-	var storedPin = app.locals.pins[pinNumber];
-	var pinDirection = app.locals.pins[pinNumber].direction;
+app.get('/readgpio/:gpio', function(req, res){ 
+	var gpioNumber = req.params.gpio;
+	var localGpio = app.locals.gpios[gpioNumber];
 
-	//var pin = new GPIO(pinNumber, pinDirection);
-	var pin = new GPIO(pinNumber);
+	var gpioActive = localGpio.active;
+	var gpioDirection = localGpio.direction;
+	var gpioEdge = localGpio.edge;
 
 	//physically read the status of the pin
-    	var pinValue = pin.readSync();
+    var gpioValue = app.locals.board[gpioNumber].readSync();
 	
 	//if for some reason the status has changed I update it in the global array
-	app.locals.pins[pinNumber].value = pinValue;
+	app.locals.gpios[gpioNumber].value = gpioValue;
 
-	storedPin = app.locals.pins[pinNumber];
-	res.send(JSON.stringify(storedPin));
+	localGpio.value = gpioValue;
+	res.send(JSON.stringify(localGpio));	
+});
+
+app.delete('/removegpio/:gpio', function(req, res){ 
+	var gpioNumber = req.params.gpio;
+	app.locals.gpios[gpioNumber] = null;
+	res.send("GPIO " + gpioNumber + " removed!");	
+});
+
+app.post('/setgpio', function(req, res){
+	var gpioNumber = req.body.gpio;
+	var gpioActive = req.body.active;
+	var gpioDirection = req.body.direction;
+	var gpioEdge = req.body.edge;
+	var gpioDescription = req.body.description;
+	var gpioValue = req.body.value;
+
+	app.locals.gpios[gpioNumber] = {};
+	app.locals.gpios[gpioNumber].active = gpioActive;
+	app.locals.gpios[gpioNumber].direction = gpioDirection;
+	app.locals.gpios[gpioNumber].edge = ((gpioDirection=='in') ? gpioEdge : 'none');
+	app.locals.gpios[gpioNumber].description = gpioDescription;
+	app.locals.gpios[gpioNumber].value = ((gpioDirection=='out') ? gpioValue : 0);
+	
+	// let's write to the board
+	//app.locals.board[gpioNumber].unexport();
+	//app.locals.board[gpioNumber] = null;	
+	app.locals.board[gpioNumber] = new GPIO(gpioNumber, gpioDirection,gpioEdge);
+	app.locals.board[gpioNumber].writeSync(gpioValue);
+	
+	var out = app.locals.gpios[gpioNumber];
+	res.send(JSON.stringify(out));
 }); 
 
 app.post('/setpin', function(req, res){
 	var pinNumber = req.body.number;
 	var pinDirection = req.body.direction;
 	var pinValue = req.body.value;
-	app.locals.pins[pinNumber].direction = pinDirection;
-	app.locals.pins[pinNumber].value = pinValue;
+	app.locals.gpios[pinNumber].direction = pinDirection;
+	app.locals.gpios[pinNumber].value = pinValue;
 	var pin = new GPIO(pinNumber, pinDirection);
     	pin.writeSync(pinValue);
-	var out = app.locals.pins[pinNumber];
+	var out = app.locals.gpios[pinNumber];
 	res.send(JSON.stringify(out));
 }); 
 
@@ -148,17 +213,15 @@ var io = require('socket.io').listen(server);
 
 // Web Socket Connection
 io.on('connection', function (socket) {
-
-	var buttons = [];
-
-	for (i = 0; i <= 27; i++) {
-		if (app.locals.pins[i]) {
-			var x = app.locals.pins[i];
-			if (x.direction == "in") {
+	for (i = 2; i <= 27; i++) {
+		if (app.locals.gpios[i]) {
+			var x = app.locals.gpios[i];
+			if ((x.direction == "in") && (x.active == 1)) {
 				(function(i){
 					var dest = 'ping'+i;
-					buttons[i] = new GPIO(i, x.direction, x.edge);
-					buttons[i].watch(function (err, value) {
+					//app.locals.board[i] = new GPIO(i, x.direction, x.edge);
+					//console.log(app.locals.board[i]);
+					app.locals.board[i].watch(function (err, value) {
 				 		if (err) throw err;
 						 socket.emit(dest,{ 'value': value });
 					});
