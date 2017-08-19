@@ -6,6 +6,7 @@ var socket_io = require('socket.io');
 var hash = require('./pass').hash;
 var ejs = require('ejs');
 
+
 var routes = require('./routes/index');
 var bodyParser = require("body-parser");
 
@@ -31,41 +32,56 @@ var settings = [
 ];
 
 // LANGUAGE
-app.locals.language = {};
-app.locals.language.inputTableTitle = "INPUT Ports";
-app.locals.language.outputTableTitle = "OUTPUT Ports";
-app.locals.language.msgInEditTitle = "INPUT Port";
-app.locals.language.msgOutEditTitle = "OUTPUT Port";
-app.locals.language.msgAdd = "Add";
-app.locals.language.msgActive = "Active";
-app.locals.language.msgGPIO = "GPIO";
-app.locals.language.msgEdge = "EDGE";
-app.locals.language.msgDirection = "Direction";
-app.locals.language.msgDescription = "Description";
-app.locals.language.msgValue = "Value";
-app.locals.language.msgStatus = "Status";
-app.locals.language.msgActions = "Actions";
-app.locals.language.msgOn = "ON";
-app.locals.language.msgOff = "OFF";
-app.locals.language.msgOk = "OK!";
-app.locals.language.msgAlarm = "ALARM!";
-app.locals.language.msgFormCancel = "Cancel";
-app.locals.language.msgFormSave = "Save";
+var language = {
+	'inputTableTitle': 'INPUT Ports',
+	'outputTableTitle': 'OUTPUT Ports',
+	'msgInEditTitle': 'INPUT Port',
+	'msgOutEditTitle': 'OUTPUT Port',
+	'add': 'Add',
+	'active': 'Attivo',
+	'gpio': 'GPIO',
+	'edge': 'EDGE',
+	'direction': 'Direction',
+	'description': 'Description',
+	'value': 'Value',
+	'status': 'Status',
+	'actions': 'Actions',
+	'on': 'ON',
+	'off': 'OFF',
+	'ok': 'OK!',
+	'alarm': 'ALARM!',
+	'cancel': 'Cancel',
+	'save': 'Save',
+};
+
+
+var board_data = {
+	title: 'Domotica Server',
+	inputPortsTableTitle:'INPUT Ports definition',
+	outputPortsTableTitle:'OUTPUT Ports definition',
+	gpios: [
+		{'gpio':17,'active':1,'direction':'in','edge':'both','value':0,'description':'Garage door'},
+		{'gpio':18,'active':0,'direction':'in','edge':'both','value':0,'description':'Main gate'},
+		{'gpio':23,'active':1,'direction':'out','edge':'none','value':0,'description':'Garage light'},
+		{'gpio':25,'active':1,'direction':'out','edge':'none','value':1,'description':'Outside lights'}
+	],
+	language: language
+};
 
 
 // data is transformed into an array in order to better work with it
-app.locals.gpios = []; // the array of the GPIO details
+//app.locals.gpios = []; // the array of the GPIO details
 app.locals.board = []; // the array of the physical GPIO objects on the Raspberry board
 
 // parsing the settings to populate the array of the GPIO details and
 // doing a setup for the GPIO pins on the board
 settings.forEach(function(element) {
-	app.locals.gpios[element.gpio] = {};
-	app.locals.gpios[element.gpio].active = element.active;
-	app.locals.gpios[element.gpio].direction = element.direction;
-	app.locals.gpios[element.gpio].edge = element.edge;
-	app.locals.gpios[element.gpio].value = element.value;
-	app.locals.gpios[element.gpio].description = element.description;
+	//app.locals.gpios[element.gpio] = {};
+	//app.locals.gpios[element.gpio].active = element.active;
+	//app.locals.gpios[element.gpio].direction = element.direction;
+	//app.locals.gpios[element.gpio].edge = element.edge;
+	//app.locals.gpios[element.gpio].value = element.value;
+	//app.locals.gpios[element.gpio].description = element.description;
 
 	if(element.active == 1) {
 		app.locals.board[element.gpio] = new GPIO(element.gpio, element.direction, element.edge);
@@ -81,8 +97,10 @@ settings.forEach(function(element) {
 	}
 }, this);
 
+
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
+app.set('board_data', board_data); 
 
 // MIDDLEWARE
 app.use('/static', express.static('public'));
@@ -120,7 +138,7 @@ app.use('/', routes);
 
 // reads all the GPIOs from the app local array
 app.get('/readall', function(req, res){ 
-	var out = JSON.stringify(app.locals.gpios); //maybe I could stringify settings
+	var out = JSON.stringify(board_data.gpios); //maybe I could stringify settings
 	res.send(out);
 });
 
@@ -143,12 +161,64 @@ app.get('/readgpio/:gpio', function(req, res){
 	res.send(JSON.stringify(localGpio));	
 });
 
+
 // removes a GPIO from the app local array
 app.delete('/removegpio/:gpio', function(req, res){ 
 	var gpioNumber = req.params.gpio;
-	app.locals.gpios[gpioNumber] = null;
+	
+	//app.locals.gpios[gpioNumber] = null;
+	
+	var found = -1;
+	for (i = 0; i < board_data.gpios.length; i++) {
+		if (board_data.gpios[i].gpio == gpioNumber) { // the gpio already exists
+			found = i; // I take the element's position
+		}
+	}
+
+	// if the gpio has been found
+	if (found >= 0) {
+		board_data.gpios.splice(found, 1); // I remove the i element
+	}
+
 	res.send("GPIO " + gpioNumber + " removed!");	
 });
+
+
+
+
+/// sets a single GPIO from the local array
+app.put('/setgpioprop/:gpio', function(req, res){
+	var gpioNumber = req.params.gpio;
+	//var gpioActive = req.body.active;
+	//var gpioDirection = req.body.direction;
+	//var gpioEdge = req.body.edge;
+	//var gpioDescription = req.body.description;
+	var gpioValue = req.body.value;
+
+	var found = -1;
+	for (i = 0; i < board_data.gpios.length; i++) {
+		if (board_data.gpios[i].gpio == gpioNumber) { // the gpio already exists
+			found = i; // I take the element's position
+		}
+	}
+
+	// if the gpio has been found
+	if (found >= 0) {
+		//console.log(board_data.gpios[i]);
+		board_data.gpios[found].value = gpioValue;
+		// let's write to the board
+		app.locals.board[gpioNumber].writeSync(gpioValue);
+	}
+
+	//console.log(found);
+	//console.log(app.locals.board);
+
+	
+	//var out = app.locals.gpios[gpioNumber];
+	res.send(JSON.stringify(board_data.gpios[found]));
+}); 
+
+
 
 
 /// sets a single GPIO from the local array
@@ -160,21 +230,37 @@ app.post('/setgpio', function(req, res){
 	var gpioDescription = req.body.description;
 	var gpioValue = req.body.value;
 
-	app.locals.gpios[gpioNumber] = {};
-	app.locals.gpios[gpioNumber].active = gpioActive;
-	app.locals.gpios[gpioNumber].direction = gpioDirection;
-	app.locals.gpios[gpioNumber].edge = ((gpioDirection=='in') ? gpioEdge : 'none');
-	app.locals.gpios[gpioNumber].description = gpioDescription;
-	app.locals.gpios[gpioNumber].value = ((gpioDirection=='out') ? gpioValue : 0);
-	
+	var found = -1;
+	for (i = 0; i < board_data.gpios.length; i++) {
+		if (board_data.gpios[i].gpio == gpioNumber) { // the gpio already exists
+			found = i; // I take the element's position
+		}
+	}
+
+	// if the gpio has been found
+	if (found >= 0) {
+		board_data.gpios.splice(found, 1); // I remove the i element
+	}
+
+	var newGpio = { 
+		'gpio': gpioNumber,
+		'active': gpioActive,
+		'direction': gpioDirection,
+		'edge': ((gpioDirection=='in') ? gpioEdge : 'none'),
+		'value': ((gpioDirection=='out') ? gpioValue : 0),
+		'description': gpioDescription 
+	};
+
+	board_data.gpios.push(newGpio);
+
 	// let's write to the board
 	//app.locals.board[gpioNumber].unexport();
 	//app.locals.board[gpioNumber] = null;	
 	app.locals.board[gpioNumber] = new GPIO(gpioNumber, gpioDirection,gpioEdge);
 	app.locals.board[gpioNumber].writeSync(gpioValue);
 	
-	var out = app.locals.gpios[gpioNumber];
-	res.send(JSON.stringify(out));
+	//var out = app.locals.gpios[gpioNumber];
+	res.send(JSON.stringify(newGpio));
 }); 
 
 // login 
