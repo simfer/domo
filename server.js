@@ -190,9 +190,10 @@ app.delete('/removegpio/:gpio', function(req, res){
 
 	// if the gpio has been found
 	if (found >= 0) {
+		app.locals.board[gpioNumber].writeSync(0);
+		app.locals.board[gpioNumber] = null;	
 		app_data.gpios.splice(found, 1); // I remove the i element
 	}
-	app.locals.board[gpioNumber] = null;	
 	res.send("GPIO " + gpioNumber + " removed!");	
 });
 

@@ -345,7 +345,7 @@
                 result.edge = 'none';
                 result.direction = 'out';
                 result.description = $('#frmOutDescription').val();
-                result.value = 0;
+                result.value = (($('#frmOutValue').val() == '<%= language.off %>') ? 0 : 1);
 
                 console.log(result);
 
