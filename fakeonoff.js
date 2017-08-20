@@ -7,7 +7,7 @@ module.exports = function GPIO(pin,direction,edge) {
     this.watch = function(cb) {
         var v = this.value;
         var p = this.pin;
-        var t = ((p % 6) + 1) * 10000; // it simply generates different intervals
+        var t = ((p % 2) + 1) * 10000; // it simply generates different intervals
         setInterval(function(){
             console.log("Button " + p + " pressed value " + v + " after time " + t);
             cb(null,v);

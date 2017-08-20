@@ -8,16 +8,16 @@ router.get('/', function(req, res) {
 
 router.get('/home', function(req, res) {
 	if (req.session.authenticated || 1) {
-		var board_data = req.app.get('board_data');
-		res.render('home',board_data);
+		var app_data = req.app.get('app_data');
+		res.render('home',app_data);
 	}
 	else
 		return res.sendStatus(401);
 });
 
 router.get('/settings', function(req, res) {
-	var board_data = req.app.get('board_data');
-	res.render('settings',board_data);
+	var app_data = req.app.get('app_data');
+	res.render('settings',app_data);
 });
 
 module.exports = router;
