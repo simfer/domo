@@ -84,17 +84,15 @@ app.locals.board = []; // the array of the physical GPIO objects on the Raspberr
 // parsing the settings to populate the array of the GPIO details and
 // doing a setup for the GPIO pins on the board
 app_data.gpios.forEach(function(element) {
-	if(element.active == 1) {
-		app.locals.board[element.gpio] = new GPIO(element.gpio, element.direction, element.edge);
-		if(element.direction == 'out') {
-			console.log("Created OUTPUT pin [" + element.gpio + "]");
-			console.log("	Value for pin [" + element.gpio + "] set to [" + element.value + "]");
-			app.locals.board[element.gpio].writeSync(element.value);
-		} else {
-			console.log("Created INPUT pin [" + element.gpio + "]");
-			console.log("	Direction for pin [" + element.gpio + "] set to [" + element.direction + "]");
-			console.log("	Edge for pin [" + element.gpio + "] set to [" + element.edge + "]");
-		}
+	app.locals.board[element.gpio] = new GPIO(element.gpio, element.direction, element.edge);
+	if(element.direction == 'out') {
+		console.log("Created OUTPUT pin [" + element.gpio + "]");
+		console.log("	Value for pin [" + element.gpio + "] set to [" + element.value + "]");
+		app.locals.board[element.gpio].writeSync(element.value);
+	} else {
+		console.log("Created INPUT pin [" + element.gpio + "]");
+		console.log("	Direction for pin [" + element.gpio + "] set to [" + element.direction + "]");
+		console.log("	Edge for pin [" + element.gpio + "] set to [" + element.edge + "]");
 	}
 }, this);
 
@@ -190,7 +188,11 @@ app.delete('/removegpio/:gpio', function(req, res){
 
 	// if the gpio has been found
 	if (found >= 0) {
-		app.locals.board[gpioNumber].writeSync(0);
+		if(app_data.gpios[found].direction == 'out') {
+			app.locals.board[gpioNumber].writeSync(0);
+		} else {
+			if(app_data.gpios[found].active == 1) app.locals.board[gpioNumber].unwatchAll();		
+		}
 		app.locals.board[gpioNumber] = null;	
 		app_data.gpios.splice(found, 1); // I remove the i element
 	}
@@ -248,8 +250,19 @@ app.put('/setgpioactive/:gpio', function(req, res){
 	if (found >= 0) {
 		app_data.gpios[found].active = gpioActive;
 	}
-	console.log(gpioNumber,app_data.gpios[found]);
-
+	
+	if (gpioActive == 0) {
+		app.locals.board[gpioNumber].unwatchAll();
+		console.log("Stopped watching on " + gpioNumber);
+	} else {
+		console.log("Started watching on " + gpioNumber);
+		app.locals.board[gpioNumber].watch(function (err, value) {
+			if (err) throw err;
+			socket.emit('receiver',{ 'sender':gpioNumber,'value': value });
+			console.log('Sender = ' + gpioNumber + '  -  Value = ' + value);
+			console.log("*** DO SOME OTHER STUFF!");
+		});
+	}
 	res.send(JSON.stringify(app_data.gpios[found]));
 }); 
 
@@ -291,9 +304,10 @@ app.post('/setgpio', function(req, res){
 	//app.locals.board[gpioNumber].unexport();
 	//app.locals.board[gpioNumber] = null;	
 	app.locals.board[gpioNumber] = new GPIO(gpioNumber, gpioDirection,gpioEdge);
-	app.locals.board[gpioNumber].writeSync(gpioValue);
+	if(gpioDirection == 'out') app.locals.board[gpioNumber].writeSync(gpioValue);
 	
 	//var out = app.locals.gpios[gpioNumber];
+	//setSocketConnection();
 	res.send(JSON.stringify(newGpio));
 }); 
 
@@ -375,21 +389,25 @@ function setSocketConnection() {
 		for (i = 0; i < app_data.gpios.length; i++) {
 			var x = app_data.gpios[i];
 			var gpioNumber = x.gpio;
-			if ((x.direction == "in") && (x.active == 1)) {
-				(function(i){
+			if (x.direction == "in") {
+				if (x.active == 1) {
+					console.log("Started watching on " + app_data.gpios[i].gpio);
+					(function(i){
+						var sender = app_data.gpios[i].gpio;
+						console.log('sender ' + sender);
+						app.locals.board[sender].watch(function (err, value) {
+							 if (err) throw err;
+							socket.emit('receiver',{ 'sender':sender,'value': value });
+							console.log("*** DO SOME OTHER STUFF!");
+						});
+					})(i);
+				} else {
 					var sender = app_data.gpios[i].gpio;
-					console.log('sender ' + sender);
-					app.locals.board[sender].watch(function (err, value) {
-						 if (err) throw err;
-						socket.emit('receiver',{ 'sender':sender,'value': value });
-					});
-				})(i);
-			} else {
-				//var sender = app_data.gpios[i].gpio;
-				//console.log(sender);
-				//if (app.locals.board[sender]) {
-				//	app.locals.board[sender].unwatchAll();
-				//}
+					console.log("Stopped watching on " + sender);
+					if (app.locals.board[sender]) {
+						app.locals.board[sender].unwatchAll();
+					}
+				}
 			}
 		}
 	});
