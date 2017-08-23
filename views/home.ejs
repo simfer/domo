@@ -38,7 +38,6 @@
         </div>
         <!-- /.container-fluid -->
     </nav>
-<%-locals.message%>
     <!-- Edit form for INPUT -->
     <div class="modal fade" id="frmInput" tabindex="-1" role="dialog" aria-labelledby="frmInputLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
@@ -209,56 +208,89 @@
     <script src="../node_modules/ejs/ejs.js"></script>
     <script>
         $(document).ready(function () {
-            var socket = io.connect();
-            socket.on('receiver', function (data) {
-                var sender = data.sender;
+            //var time = (new Date()).getTime();
+            //var client = 'CL' + time;
+            //var socket = io('http://localhost:3000/', { query: 'user=' + client });
+            
+            // define the socket
+            var socket = io('http://localhost:3000/');
+
+            // connect function
+            socket.on( 'connect', function () {
+                console.log( 'Connected to server ');
+            });
+
+            // this function manages the emission coming from the server
+            socket.on('toClient', function(data){
+                var gpioNumber = data.gpio;
                 var v = data.value;
-                console.log('Sender ' + sender + ' - value ' + v);
+                console.log("Received value [" + v + "] from [" + gpioNumber + "]")
+                // detecting the button related to the message
+                var button = $('#btnInput' + gpioNumber);
 
-                var button = $('#btnInput'+sender);
-
-                if (v == 0) {
+                if (v == 0) { //if the value is 0 the button is at rest then the color is green
                     button.removeClass('btn-danger');
                     button.addClass('btn-success');
                     button.val('<%=language.ok%>');
-                } else {
+                } else { // else the color is red
                     button.removeClass('btn-success');
                     button.addClass('btn-danger');
-                    button.val('<%=language.alarm%>!');
+                    button.val('<%=language.alarm%>');
                 }
-
             });
-                
 
-            var pins = [];
+            // disconnect function
+            socket.on('disconnect', function () {
+                socket.disconnect();
+                console.log("Disconnected from the server");
+            });
 
+            // this function is called when the form for the INPUT ports is opened
             $('#frmInput').modal({
                 keyboard: true,
                 backdrop: "static",
                 show: false
             }).on('show.bs.modal', function (event) {
-                if (event.relatedTarget) {
+                if (event.relatedTarget) { // if there is an event I get the event's sender
                     var senderId = (event.relatedTarget ? event.relatedTarget.id : "");
-                    var rowId = (event.relatedTarget.id !== "inPortsAdd" ? senderId.replace('edit', '') : "");
-
-                    if (rowId) { // edit mode
+                    // the button ID is calculated only if the button triggering the event was an "edit" button
+                    var buttonId = (event.relatedTarget.id !== "inPortsAdd" ? senderId.replace('edit', '') : "");
+                    // if the button ID is not empty then we are in EDIT mode
+                    if (buttonId) { // edit mode
+                        // we need to generate dinamically the drop down list of the available ports
+                        // since this is an EDIT operation we populate this drop down with all the values
                         var portsOptionHtml = '';
                         for (i = 2; i <= 27; i++) {
                             portsOptionHtml += '<option>' + i + '</option>';
                         }
+                        // building the drop down
                         $('#frmInGpio').html(portsOptionHtml);
 
-                        $('#frmInGpio').val(rowId);
+                        // setting the drop down with the selected row
+                        $('#frmInGpio').val(buttonId);
+
+                        // since we are in EDIT mode we cannot change the GPIO value
                         $('#frmInGpio').prop('disabled', true);
+
+                        // let's get the entire row
                         var row = $(event.relatedTarget).closest('tr');
                         var columns = row.find('td');
 
-                        $('#frmInEdge').val(columns[2].textContent);
-                        $('#frmInDescription').val(columns[3].textContent);
+                        // let's populate the fields in the form with the values of the selected columns
+                        $('#frmInEdge').val(columns[2].textContent); // column EDGE
+                        $('#frmInDescription').val(columns[3].textContent); // column DESCRIPTION
                     } else { // add mode
+                        // the GPIO can be selected
                         $('#frmInGpio').prop('disabled', false);
+                        
+                        // the EDGE is initially set to 'none'
                         $('#frmInEdge').val('none');
+                        
+                        // the description is cleared 
                         $('#frmInDescription').val('');
+
+                        // let's check what are the avaialble pins and based on that let's build the drop down list
+                        // for the GPIOs
                         readAll(function (pins) {
                             var portsOptionHtml = '';
                             var unusedPins = [];
@@ -278,35 +310,52 @@
                     }
                 }
             });
-
+            
+            // this function is called when the form for the OUTPUT ports is opened
             $('#frmOutput').modal({
                 keyboard: true,
                 backdrop: "static",
                 show: false
             }).on('show.bs.modal', function (event) {
-                if (event.relatedTarget) {
+                if (event.relatedTarget) { // if there is an event I get the event's sender
                     var senderId = (event.relatedTarget ? event.relatedTarget.id : "");
-                    var rowId = (event.relatedTarget.id !== "outPortsAdd" ? senderId.replace('edit', '') : "");
+                    // the button ID is calculated only if the button triggering the event was an "edit" button
+                    var buttonId = (event.relatedTarget.id !== "outPortsAdd" ? senderId.replace('edit', '') : "");
 
-                    console.log(senderId);
-                    console.log(rowId);
-                    if (rowId) { // edit mode
+                    // if the button ID is not empty then we are in EDIT mode
+                    if (buttonId) { // edit mode
+                        // we need to generate dinamically the drop down list of the available ports
+                        // since this is an EDIT operation we populate this drop down with all the values
                         var portsOptionHtml = '';
                         for (i = 2; i <= 27; i++) {
                             portsOptionHtml += '<option>' + i + '</option>';
                         }
-                        $('#frmOutGpio').html(portsOptionHtml);
-                        $('#frmOutGpio').val(rowId);
-                        $('#frmOutGpio').prop('disabled', true);
-                        var row = $(event.relatedTarget).closest('tr');
-                        console.log(row);
-                        var columns = row.find('td');
-                        console.log(columns);
 
-                        $('#frmOutDescription').val(columns[1].textContent);
-                        $('#frmOutValue').val($(columns[2].children[0]).val());
+                        // building the drop down
+                        $('#frmOutGpio').html(portsOptionHtml);
+
+                        // setting the drop down with the selected row
+                        $('#frmOutGpio').val(buttonId);
+
+                        // since we are in EDIT mode we cannot change the GPIO value
+                        $('#frmOutGpio').prop('disabled', true);
+
+                        // let's get the entire row
+                        var row = $(event.relatedTarget).closest('tr');
+                        var columns = row.find('td');
+
+                        // let's populate the fields in the form with the values of the selected columns
+                        $('#frmOutDescription').val(columns[1].textContent); // column DESCRIPTION
+                        $('#frmOutValue').val($(columns[2].children[0]).val()); // column VALUE
                     } else { // add mode
+                        // the GPIO can be selected
                         $('#frmOutGpio').prop('disabled', false);
+
+                        // the description is cleared 
+                        $('#frmOutDescription').val('');
+
+                        // let's check what are the avaialble pins and based on that let's build the drop down list
+                        // for the GPIOs
                         readAll(function (pins) {
                             var portsOptionHtml = '';
                             var unusedPins = [];
@@ -329,17 +378,28 @@
             });
 
             $('#btnSaveInput').click(function (event) {
+                // let's check if we are in EDIT mode
+                var editMode = $('#frmInGpio').prop('disabled');
+
                 var result = {};
                 result.gpio = $('#frmInGpio').val();
                 result.edge = $('#frmInEdge').val();
                 result.direction = 'in';
                 result.description = $('#frmInDescription').val();
-                result.value = 0; //maybe -1
-                console.log(result);
-                setgpio(result);
+                result.value = 0;
+
+                if (editMode) {
+                    setGpio(result);
+                } else {
+                    result.active = 0; // when a new GPIO IN is created it starts as inactive
+                    addGpio(result);
+                }
             });
 
             $('#btnSaveOutput').click(function (event) {
+                // let's check if we are in EDIT mode
+                var editMode = $('#frmOutGpio').prop('disabled');
+
                 var result = {};
                 result.gpio = $('#frmOutGpio').val();
                 result.edge = 'none';
@@ -347,80 +407,76 @@
                 result.description = $('#frmOutDescription').val();
                 result.value = (($('#frmOutValue').val() == '<%= language.off %>') ? 0 : 1);
 
-                console.log(result);
-
-                setgpio(result);
-
+                if (editMode) setGpio(result);
+                else {
+                    result.active = 1; // when a new GPIO OUT is created it starts as inactive
+                    addGpio(result)
+                };
             });
 
             $('.btnDelete').click(function (event) {
                 var button = $(this);
-                var rowID = button.prop('id').replace('delete', '');
-                removegpio(rowID);
+                var buttonId = button.prop('id').replace('delete', '');
+                removeGpio(buttonId);
             });
 
             $('.btnStatusOutput').click(function (event) {
                 var buttonID = $(event.target).prop('id');
                 var gpio = buttonID.replace('btnOutput', '');
 
-                console.log(gpio);
+                var p = {};
+                p.gpio = gpio;
+
                 if ($(event.target).hasClass('btn-default')) {
                     $(event.target).removeClass('btn-default');
                     $(event.target).addClass('btn-success');
-                    setgpioprop(gpio,1);
                     $(event.target).val('<%=language.on%>');
+                    p.value = 1;
                 } else {
                     $(event.target).removeClass('btn-success');
                     $(event.target).addClass('btn-default');
                     $(event.target).val('<%=language.off%>');
-                    setgpioprop(gpio,0);
+                    p.value = 0;
                 }
+                setGpio(p);
             });
 
             $('.ios8-switch').click(function (event) {
                 var button = $(this);
-                var rowID = button.prop('id').replace('zone', '');
+                var buttonId = button.prop('id').replace('zone', '');
                 var checked = button.prop('checked');
                 var row = $(this).closest('tr');
                 var columns = row.find('td');
+                var p = {};
+                p.gpio = buttonId;
                 if (!checked) {
                     for (i = 1; i < columns.length; i++) {
                         $(columns[i]).addClass('disabledCell');
                     }
-                    setGpioActive(rowID,0);
+                    p.active = 0;
+                    //setGpioActive(buttonId,0);
+                    //var buttonStatus = $('#btnInput'+buttonId);
+                    //buttonStatus.removeClass('btn-danger');
+                    //buttonStatus.addClass('btn-success');
+                    //buttonStatus.val('<%=language.ok%>');
                 } else {
                     for (i = 1; i < columns.length; i++) {
                         $(columns[i]).removeClass('disabledCell');
                     }
-                    setGpioActive(rowID,1);
+                    p.active = 1;
+                    //setGpioActive(buttonId,1);
+                    // in this case we should read the gpio's status and set the button status UI accordingly
                 }
+                console.log(p);
+                setGpio(p);
+                
             });
 
-            function setGpioActive(n,v) {
-                var data = {
-                    "active": v
-                };
-                var settings = {
-                    "async": true,
-                    "url": "/setgpioactive/"+n,
-                    "method": "PUT",
-                    "headers": {
-                        "Authorization": "Bearer 1234",
-                        "content-type": "application/json",
-                        "cache-control": "no-cache"
-                    },
-                    "data": JSON.stringify(data)
-                }
-                $.ajax(settings).done(function (response, status, xhr) {
-                    if (xhr.status == 200) {
-                        console.log(response);
-                    } else {
-                        console.log("ERROR: " + xhr.status);
-                    }
-                });
+            // FUNCTIONS
 
-            }
-            
+            /**
+             * readAll 
+            **/
             function readAll(cb) {
                 var settings = {
                     "url": "/readall",
@@ -439,35 +495,97 @@
 
             }
 
-            function setgpio(p) {
-                var data = {
-                    "gpio": p.gpio,
-                    "active": 1,
-                    "direction": p.direction,
-                    "edge": p.edge,
-                    "description": p.description,
-                    "value": p.value
-                };
-                var settings = {
-                    "async": true,
-                    "url": "/setgpio",
-                    "method": "POST",
-                    "headers": {
-                        "Authorization": "Bearer 1234",
-                        "content-type": "application/json",
-                        "cache-control": "no-cache"
-                    },
-                    "data": JSON.stringify(data)
-                }
-                $.ajax(settings).done(function (response, status, xhr) {
-                    if (xhr.status == 200) {
-                        location.reload();
-                        console.log(response);
-                    } else {
-                        console.log("ERROR: " + xhr.status);
+            /**
+             * addGpio 
+            **/
+            function addGpio(p) {
+                if(p) {
+                    var data = {
+                        "active": p.active,
+                        "direction": p.direction,
+                        "edge": p.edge,
+                        "description": p.description,
+                        "value": p.value
+                    };
+                    var settings = {
+                        "async": true,
+                        "url": "/addgpio/" + p.gpio,
+                        "method": "POST",
+                        "headers": {
+                            "Authorization": "Bearer 1234",
+                            "content-type": "application/json",
+                            "cache-control": "no-cache"
+                        },
+                        "data": JSON.stringify(data)
                     }
-                });
+                    $.ajax(settings).done(function (response, status, xhr) {
+                        if (xhr.status == 200) {
+                            location.reload();
+                            console.log(response);
+                        } else {
+                            console.log("ERROR: " + xhr.status);
+                        }
+                    });
+                }
             }
+
+
+            /**
+             * setGpio 
+            **/
+
+            function setGpio(p) {
+                if (p) {
+                    var data = p;
+
+                    var settings = {
+                        "async": true,
+                        "url": "/setgpio/" + p.gpio,
+                        "method": "PUT",
+                        "headers": {
+                            "Authorization": "Bearer 1234",
+                            "content-type": "application/json",
+                            "cache-control": "no-cache"
+                        },
+                        "data": JSON.stringify(data)
+                        }
+                    $.ajax(settings).done(function (response, status, xhr) {
+                        if (xhr.status == 200) {
+                            location.reload();
+                            console.log(response);
+                        } else {
+                            console.log("ERROR: " + xhr.status);
+                        }
+                    });
+                }
+            }
+
+
+
+            /**
+             * removeGpio 
+            **/
+            
+            function removeGpio(gp) {
+                if(gp) {
+                    var settings = {
+                        "url": "/removegpio/" + gp,
+                        "method": "DELETE"
+                    }
+
+                    $.ajax(settings).done(function (response, status, xhr) {
+                        if (xhr.status == 200) {
+                            location.reload();
+                            console.log(response);
+                        } else {
+                            console.log("ERROR: " + xhr.status);
+                        }
+                    });
+                }
+            }          
+
+
+ 
 
             function setgpioprop(n,v) {
                 var data = {
@@ -495,48 +613,6 @@
                 
             }
 
-            function removegpio(gp) {
-                var settings = {
-                    "url": "/removegpio/" + gp,
-                    "method": "DELETE"
-                }
-
-                $.ajax(settings).done(function (response, status, xhr) {
-                    if (xhr.status == 200) {
-                        location.reload();
-                        console.log(response);
-                    } else {
-                        console.log("ERROR: " + xhr.status);
-                    }
-                });
-            }
-
-
-            function setPin(n, d, v) {
-                var pin = {
-                    "number": n,
-                    "direction": d,
-                    "value": v
-                };
-                var settings = {
-                    "async": true,
-                    "url": "/setpin",
-                    "method": "POST",
-                    "headers": {
-                        "Authorization": "Bearer 1234",
-                        "content-type": "application/json",
-                        "cache-control": "no-cache"
-                    },
-                    "data": JSON.stringify(pin)
-                }
-                $.ajax(settings).done(function (response, status, xhr) {
-                    if (xhr.status == 200) {
-                        console.log(response);
-                    } else {
-                        console.log("ERROR: " + xhr.status);
-                    }
-                });
-            }
         });
     </script>
 

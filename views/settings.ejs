@@ -12,7 +12,7 @@
 
     <link href="/assets/styles/style.css" rel="stylesheet">
 
-    <title><%= title %></title>
+    <title>Domotica</title>
 </head>
 
 <body>
@@ -38,7 +38,6 @@
         </div>
         <!-- /.container-fluid -->
     </nav>
-
     <!-- Edit form for INPUT -->
     <div class="modal fade" id="frmInput" tabindex="-1" role="dialog" aria-labelledby="frmInputLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
@@ -134,16 +133,16 @@
                                 if (gpios[i].direction == 'in') { %>
                                     <tr>
                                         <td>
-                                            <input class="ios8-switch ios8-switch-sm" id="zone<%= i %>" type="checkbox" checked/>
-                                            <label for="zone<%= i %>">&nbsp;</label>
+                                            <input class="ios8-switch ios8-switch-sm" id="zone<%= gpios[i].gpio %>" type="checkbox" <%=((gpios[i].active == '1' ) ? 'checked' : '')%>/>
+                                            <label for="zone<%= gpios[i].gpio %>">&nbsp;</label>
                                         </td>
-                                        <td><%= gpios[i].gpio %></td>
-                                        <td><%= gpios[i].edge %></td>
-                                        <td><%= gpios[i].description %></td>
-                                        <td style="text-align:center">
-                                            <input class="btn <%=((gpios[i].value == '0' ) ? 'btn-success' : 'btn-danger')%> btnStatusInput disabled" type="button" value="<%=((gpios[i].value == '0' ) ? language.ok : language.alarm)%>"/>
+                                        <td class="<%=((gpios[i].active == '1' ) ? '' : 'disabledCell')%>"><%= gpios[i].gpio %></td>
+                                        <td class="<%=((gpios[i].active == '1' ) ? '' : 'disabledCell')%>"><%= gpios[i].edge %></td>
+                                        <td class="<%=((gpios[i].active == '1' ) ? '' : 'disabledCell')%>"><%= gpios[i].description %></td>
+                                        <td class="<%=((gpios[i].active == '1' ) ? '' : 'disabledCell')%>" style="text-align:center">
+                                            <input id="btnInput<%= gpios[i].gpio %>" class="btn <%=((gpios[i].value == '0' ) ? 'btn-success' : 'btn-danger')%> btnStatusInput disabled" type="button" value="<%=((gpios[i].value == '0' ) ? language.ok : language.alarm)%>"/>
                                         </td>
-                                        <td style="text-align:center">
+                                        <td class="<%=((gpios[i].active == '1' ) ? '' : 'disabledCell')%>" style="text-align:center">
                                             <button id="edit<%= gpios[i].gpio %>" type="button" class="btn btn-warning btn-sm btnEdit" data-toggle="modal" data-target="#frmInput">
                                             <span class="glyphicon glyphicon-pencil" aria-hidden="true"></span>
                                             </button>&nbsp;
@@ -180,7 +179,7 @@
                                             <td><%= gpios[i].gpio %></td>
                                             <td><%= gpios[i].description %></td>
                                             <td style="text-align:center">
-                                            <input id="onoff<%= gpios[i].gpio %>" class="btn <%=((gpios[i].value == '0' ) ? 'btn-default' : 'btn-success')%> btnStatusOutput" 
+                                            <input id="btnOutput<%= gpios[i].gpio %>" class="btn <%=((gpios[i].value == '0' ) ? 'btn-default' : 'btn-success')%> btnStatusOutput" 
                                                 type="button" 
                                                 value="<%=((gpios[i].value == '0' ) ? language.off : language.on)%>"/>
                                             </td>
@@ -209,6 +208,55 @@
     <script src="../node_modules/ejs/ejs.js"></script>
     <script>
         $(document).ready(function () {
+
+            /*var interval = setInterval(function(){
+                console.log("Interval");
+            }, 2000);
+            console.log(interval);
+            */
+            var socket = io.connect();
+
+            $('#btnSend').click(function(){
+                socket.emit('fromClient', $('#new-message').val());
+                $('#new-message').val('');
+            });
+
+            socket.on('toClient', function(data){
+                var gpioNumber = data.gpio;
+                var v = data.value;
+                console.log("Received value [" + v + "] from [" + gpioNumber + "]")
+                var button = $('#btnInput'+gpioNumber);
+                if (v == 0) {
+                    button.removeClass('btn-danger');
+                    button.addClass('btn-success');
+                    button.val('<%=language.ok%>');
+                } else {
+                    button.removeClass('btn-success');
+                    button.addClass('btn-danger');
+                    button.val('<%=language.alarm%>');
+                }
+            });
+
+            /*
+            socket.on('messageToClient', function (data) {
+                var sender = data.sender;
+                var v = data.value;
+                console.log('Sender ' + sender + ' - value ' + v);
+
+                var button = $('#btnInput'+sender);
+
+                if (v == 0) {
+                    button.removeClass('btn-danger');
+                    button.addClass('btn-success');
+                    button.val('<%=language.ok%>');
+                } else {
+                    button.removeClass('btn-success');
+                    button.addClass('btn-danger');
+                    button.val('<%=language.alarm%>');
+                }
+            }); */
+                
+
             var pins = [];
 
             $('#frmInput').modal({
@@ -313,7 +361,7 @@
                 result.edge = $('#frmInEdge').val();
                 result.direction = 'in';
                 result.description = $('#frmInDescription').val();
-                result.value = -1;
+                result.value = 0; //maybe -1
                 console.log(result);
                 setgpio(result);
             });
@@ -324,16 +372,12 @@
                 result.edge = 'none';
                 result.direction = 'out';
                 result.description = $('#frmOutDescription').val();
-                result.value = 0;
+                result.value = (($('#frmOutValue').val() == '<%= language.off %>') ? 0 : 1);
 
                 console.log(result);
 
                 setgpio(result);
 
-            });
-
-            readAll(function (pins) {
-                //generateTable(pins);
             });
 
             $('.btnDelete').click(function (event) {
@@ -344,23 +388,26 @@
 
             $('.btnStatusOutput').click(function (event) {
                 var buttonID = $(event.target).prop('id');
-                var gpio = buttonID.replace('onoff', '');
+                var gpio = buttonID.replace('btnOutput', '');
 
                 console.log(gpio);
                 if ($(event.target).hasClass('btn-default')) {
                     $(event.target).removeClass('btn-default');
                     $(event.target).addClass('btn-success');
                     setgpioprop(gpio,1);
-                    $(event.target).val('ON');
+                    $(event.target).val('<%=language.on%>');
                 } else {
                     $(event.target).removeClass('btn-success');
                     $(event.target).addClass('btn-default');
-                    $(event.target).val('OFF');
+                    $(event.target).val('<%=language.off%>');
                     setgpioprop(gpio,0);
                 }
             });
 
             $('.ios8-switch').click(function (event) {
+                //console.log(interval);
+                //clearInterval(interval);
+
                 var button = $(this);
                 var rowID = button.prop('id').replace('zone', '');
                 var checked = button.prop('checked');
@@ -370,13 +417,42 @@
                     for (i = 1; i < columns.length; i++) {
                         $(columns[i]).addClass('disabledCell');
                     }
+                    setGpioActive(rowID,0);
                 } else {
                     for (i = 1; i < columns.length; i++) {
                         $(columns[i]).removeClass('disabledCell');
                     }
+                    setGpioActive(rowID,1);
                 }
+                //btnInput17
+                
             });
 
+            function setGpioActive(n,v) {
+                var data = {
+                    "active": v
+                };
+                var settings = {
+                    "async": true,
+                    "url": "/setgpioactive/"+n,
+                    "method": "PUT",
+                    "headers": {
+                        "Authorization": "Bearer 1234",
+                        "content-type": "application/json",
+                        "cache-control": "no-cache"
+                    },
+                    "data": JSON.stringify(data)
+                }
+                $.ajax(settings).done(function (response, status, xhr) {
+                    if (xhr.status == 200) {
+                        console.log(response);
+                    } else {
+                        console.log("ERROR: " + xhr.status);
+                    }
+                });
+
+            }
+            
             function readAll(cb) {
                 var settings = {
                     "url": "/readall",

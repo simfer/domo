@@ -1,98 +1,54 @@
-const platform = "PC"; // {PC = emulated mode, RASP = Raspberry mode}
-
 var express = require('express');
 var session = require('express-session');
 var socket_io = require('socket.io');
 var hash = require('./pass').hash;
 var ejs = require('ejs');
-
+var privateSocket = null;
 
 var routes = require('./routes/index');
 var bodyParser = require("body-parser");
 
-// if I've enabled the emulated mode I use the fake GPIO module else
-// I use the real "onoff" library
-if (platform == 'PC') {
-	var GPIO = require("./fakeonoff.js");
-} else {
+// detecting if we are on a real RASPBERRY or not
+const pitect = require('pitect');
+if(pitect.isPi()) {
+	console.log('This is a Raspberry Pi.');
+	console.log('This is: ' + pitect.piModel().name);
 	var GPIO = require('onoff').Gpio;	
+} else {
+	console.log('This is not a Raspberry');
+	var GPIO = require("./fakeonoff.js");
 }
 
-var users = { admin: { name: 'admin' }};
-var adminPassword = 'Admin123'; // this should be managed differently
+// dummy database 
+// the following two lines should be managed differently
+var users = { admin: { name: 'admin', password: 'Admin123' }};
+hash(users.admin.password, function(err, salt, hash){ 
+	if (err) throw err; 
+	// store the salt & hash in the "db"
+	users.admin.salt = salt; 
+	users.admin.hash = hash.toString();
+}); 
 
-var app = express();
+var app = express(); // creating the main application
 
+// data are read from an external JSON file
 var jsonfile = require('jsonfile');
 var file = 'app_data.json'
-
 var app_data = jsonfile.readFileSync(file);
 
-// this is the variable hosting initial data. These data could come from a DB
-/*
-var settings = [
-	{'gpio':17,'active':1,'direction':'in','edge':'both','value':0,'description':'Garage door'},
-	{'gpio':18,'active':0,'direction':'in','edge':'both','value':0,'description':'Main gate'},
-	{'gpio':23,'active':1,'direction':'out','edge':'none','value':0,'description':'Garage light'},
-	{'gpio':25,'active':1,'direction':'out','edge':'none','value':1,'description':'Outside lights'}
-];
 
-// LANGUAGE
-var language = {
-	'inputTableTitle': 'INPUT Ports',
-	'outputTableTitle': 'OUTPUT Ports',
-	'msgInEditTitle': 'INPUT Port',
-	'msgOutEditTitle': 'OUTPUT Port',
-	'add': 'Add',
-	'active': 'Attivo',
-	'gpio': 'GPIO',
-	'edge': 'EDGE',
-	'direction': 'Direction',
-	'description': 'Description',
-	'value': 'Value',
-	'status': 'Status',
-	'actions': 'Actions',
-	'on': 'ON',
-	'off': 'OFF',
-	'ok': 'OK!',
-	'alarm': 'ALARM!',
-	'cancel': 'Cancel',
-	'save': 'Save',
-	'error': 'ERROR',
-	'EINVUIDPWD':'Invalid user ID and/or password!'
-};
-*/
-
-//var app_data = {
-//	gpios: settings,
-//	language: language
-//};
-
-
-//var jsonfile = require('jsonfile');
-
-//var file = 'app_data.json'
- 
-//jsonfile.writeFile(file, app_data, function (err) {
-//  console.error(err)
-//});
-
-// data is transformed into an array in order to better work with it
-//app.locals.gpios = []; // the array of the GPIO details
+// we are creating an arary to hos all the physical GPIOs we are going to open
 app.locals.board = []; // the array of the physical GPIO objects on the Raspberry board
 
-// parsing the settings to populate the array of the GPIO details and
-// doing a setup for the GPIO pins on the board
+// parsing the data to populate the board array
+// in this step we are physically creating the GPIOs in a different way based on the GPIO's direction
 app_data.gpios.forEach(function(element) {
 	app.locals.board[element.gpio] = new GPIO(element.gpio, element.direction, element.edge);
 	if(element.direction == 'out') {
-		console.log("Created OUTPUT pin [" + element.gpio + "]");
-		console.log("	Value for pin [" + element.gpio + "] set to [" + element.value + "]");
+		console.log("Created pin [" + element.gpio + "] - Value [" + element.value + "]");
 		app.locals.board[element.gpio].writeSync(element.value);
 	} else {
-		console.log("Created INPUT pin [" + element.gpio + "]");
-		console.log("	Direction for pin [" + element.gpio + "] set to [" + element.direction + "]");
-		console.log("	Edge for pin [" + element.gpio + "] set to [" + element.edge + "]");
+		console.log("Created pin [" + element.gpio + "] - Direction [" + element.direction + "] - Edge [" + element.edge + "]");
 	}
 }, this);
 
@@ -113,7 +69,7 @@ app.use('/assets/fonts', express.static(__dirname + '/assets/fonts'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(session({
-    secret:'2C44-4D44-WppQ38S',
+    secret:'6C49-4A81-DapR3Qq',
     resave: true,
     saveUninitialized: true
 }));
@@ -133,183 +89,149 @@ app.use(function(req, res, next){
 app.use(logger);
 app.use('/', routes);
 
-// API server
 
+/*
+ * API server
+ */
 
-// reads all the GPIOs from the app local array
-app.get('/writeappdata', function(req, res){
-	var jsonfile = require('jsonfile');
-	var file = 'app_data.json'
- 
-	jsonfile.writeFile(file, app_data, function (err) {
-		if(err) res.send(err);
-		var out = app_data
-		res.send(out);
-	});
-});
-
-
-// reads all the GPIOs from the app local array
+// reads all the GPIOs from the app_data variable
 app.get('/readall', function(req, res){ 
-	var out = JSON.stringify(app_data.gpios); //maybe I could stringify settings
+	var out = JSON.stringify(app_data.gpios);
 	res.send(out);
 });
 
-// reads a single GPIO from the app local array
-app.get('/readgpio/:gpio', function(req, res){ 
+
+
+/// add a single GPIO if it doesn't exist
+app.post('/addgpio/:gpio', function(req, res){
 	var gpioNumber = req.params.gpio;
-	var localGpio = app.locals.gpios[gpioNumber];
 
-	var gpioActive = localGpio.active;
-	var gpioDirection = localGpio.direction;
-	var gpioEdge = localGpio.edge;
-
-	//physically read the status of the pin
-    var gpioValue = app.locals.board[gpioNumber].readSync();
-	
-	//if for some reason the status has changed I update it in the global array
-	app.locals.gpios[gpioNumber].value = gpioValue;
-
-	localGpio.value = gpioValue;
-	res.send(JSON.stringify(localGpio));	
-});
-
-
-// removes a GPIO from the app local array
-app.delete('/removegpio/:gpio', function(req, res){ 
-	var gpioNumber = req.params.gpio;
-	
-	var found = -1;
-	for (i = 0; i < app_data.gpios.length; i++) {
-		if (app_data.gpios[i].gpio == gpioNumber) { // the gpio already exists
-			found = i; // I take the element's position
-		}
-	}
-
-	// if the gpio has been found
-	if (found >= 0) {
-		if(app_data.gpios[found].direction == 'out') {
-			app.locals.board[gpioNumber].writeSync(0);
-		} else {
-			if(app_data.gpios[found].active == 1) app.locals.board[gpioNumber].unwatchAll();		
-		}
-		app.locals.board[gpioNumber] = null;	
-		app_data.gpios.splice(found, 1); // I remove the i element
-	}
-	res.send("GPIO " + gpioNumber + " removed!");	
-});
-
-
-
-
-/// sets a single GPIO from the local array
-app.put('/setgpioprop/:gpio', function(req, res){
-	var gpioNumber = req.params.gpio;
-	//var gpioActive = req.body.active;
-	//var gpioDirection = req.body.direction;
-	//var gpioEdge = req.body.edge;
-	//var gpioDescription = req.body.description;
-	var gpioValue = req.body.value;
-
-	var found = -1;
-	for (i = 0; i < app_data.gpios.length; i++) {
-		if (app_data.gpios[i].gpio == gpioNumber) { // the gpio already exists
-			found = i; // I take the element's position
-		}
-	}
-
-	// if the gpio has been found
-	if (found >= 0) {
-		//console.log(app_data.gpios[i]);
-		app_data.gpios[found].value = gpioValue;
-		// let's write to the board
-		app.locals.board[gpioNumber].writeSync(gpioValue);
-	}
-
-	//console.log(found);
-	//console.log(app.locals.board);
-
-	
-	//var out = app.locals.gpios[gpioNumber];
-	res.send(JSON.stringify(app_data.gpios[found]));
-}); 
-
-
-app.put('/setgpioactive/:gpio', function(req, res){
-	var gpioNumber = req.params.gpio;
-	var gpioActive = req.body.active;
-
-	var found = -1;
-	for (i = 0; i < app_data.gpios.length; i++) {
-		if (app_data.gpios[i].gpio == gpioNumber) { // the gpio already exists
-			found = i; // I take the element's position
-		}
-	}
-
-	// if the gpio has been found
-	if (found >= 0) {
-		app_data.gpios[found].active = gpioActive;
-	}
-	
-	if (gpioActive == 0) {
-		app.locals.board[gpioNumber].unwatchAll();
-		console.log("Stopped watching on " + gpioNumber);
-	} else {
-		console.log("Started watching on " + gpioNumber);
-		app.locals.board[gpioNumber].watch(function (err, value) {
-			if (err) throw err;
-			socket.emit('receiver',{ 'sender':gpioNumber,'value': value });
-			console.log('Sender = ' + gpioNumber + '  -  Value = ' + value);
-			console.log("*** DO SOME OTHER STUFF!");
-		});
-	}
-	res.send(JSON.stringify(app_data.gpios[found]));
-}); 
-
-
-
-/// sets a single GPIO from the local array
-app.post('/setgpio', function(req, res){
-	var gpioNumber = req.body.gpio;
 	var gpioActive = req.body.active;
 	var gpioDirection = req.body.direction;
 	var gpioEdge = req.body.edge;
 	var gpioDescription = req.body.description;
 	var gpioValue = req.body.value;
 
-	var found = -1;
-	for (i = 0; i < app_data.gpios.length; i++) {
-		if (app_data.gpios[i].gpio == gpioNumber) { // the gpio already exists
-			found = i; // I take the element's position
-		}
-	}
-
-	// if the gpio has been found
-	if (found >= 0) {
-		app_data.gpios.splice(found, 1); // I remove the i element
-	}
-
-	var newGpio = { 
-		'gpio': gpioNumber,
-		'active': gpioActive,
-		'direction': gpioDirection,
-		'edge': ((gpioDirection=='in') ? gpioEdge : 'none'),
-		'value': ((gpioDirection=='out') ? gpioValue : 0),
-		'description': gpioDescription 
-	};
-
-	app_data.gpios.push(newGpio);
-
-	// let's write to the board
-	//app.locals.board[gpioNumber].unexport();
-	//app.locals.board[gpioNumber] = null;	
-	app.locals.board[gpioNumber] = new GPIO(gpioNumber, gpioDirection,gpioEdge);
-	if(gpioDirection == 'out') app.locals.board[gpioNumber].writeSync(gpioValue);
+	// searching for the gpio
+	var found = findGpio(gpioNumber);
+	var gpioIndex = found.index;
 	
-	//var out = app.locals.gpios[gpioNumber];
-	//setSocketConnection();
-	res.send(JSON.stringify(newGpio));
+	// if the gpio has been found
+	if (gpioIndex > -1) {
+		res.status(500).send('GPIO already existing!');
+	} else {
+		var newGpio = { 
+			'gpio': gpioNumber,
+			'active': gpioActive,
+			'direction': gpioDirection,
+			'edge': ((gpioDirection=='in') ? gpioEdge : 'none'),
+			'value': ((gpioDirection=='out') ? gpioValue : 0),
+			'description': gpioDescription 
+		};
+	
+		app_data.gpios.push(newGpio);
+	
+		// writing data to the disk
+		writeAppData();
+	
+		// let's write to the board	
+		app.locals.board[gpioNumber] = new GPIO(gpioNumber, gpioDirection,gpioEdge);
+		if(gpioDirection == 'out') app.locals.board[gpioNumber].writeSync(gpioValue);
+		console.log(newGpio);
+		//setSocketConnection();
+		res.send(JSON.stringify(newGpio));
+	}
 }); 
+
+
+/// sets a single GPIO from the local array
+app.put('/setgpio/:gpio', function(req, res){
+	var gpioNumber = req.params.gpio;
+	
+	// searching for the gpio
+	var found = findGpio(gpioNumber);
+	var gpioIndex = found.index;
+	
+	// if the gpio is not found
+	if (gpioIndex == -1) {
+		res.status(500).send('GPIO NOT found!');
+	} else {
+		console.log(req.body);
+
+		var gpioActive = ((req.body.active != undefined) ? req.body.active : found.gpio.active);
+		var gpioDirection = ((req.body.direction != undefined) ? req.body.direction : found.gpio.direction);
+		var gpioEdge = ((req.body.edge != undefined) ? req.body.edge : found.gpio.edge);
+		var gpioDescription = ((req.body.description != undefined) ? req.body.description : found.gpio.description);
+		var gpioValue = ((req.body.value != undefined) ? req.body.value : found.gpio.value);
+	
+		/*
+		console.log('[' + req.body.active  +'] - [' + gpioActive +']');
+		console.log('[' + req.body.direction  +'] - [' + gpioDirection +']');
+		console.log('[' + req.body.edge  +'] - [' + gpioEdge +']');		
+		console.log('[' + req.body.description  +'] - [' + gpioDescription +']');
+		console.log('[' + req.body.value  +'] - [' + gpioValue +']');	
+		*/
+		
+		app_data.gpios[gpioIndex].active =  gpioActive;
+		if (gpioDirection == 'in') {
+			if (gpioActive == 0) {
+				app.locals.board[gpioNumber].unwatchAll();
+				console.log("Stopped watching on " + gpioNumber + "!");
+			} else {
+				console.log("Started watching on " + gpioNumber + "!");
+				app.locals.board[gpioNumber].watch(function (err, value) {
+					if (err) throw err;
+					privateSocket.emit('toClient',{ 'gpio':gpioNumber,'value': value });
+					console.log('Server sent GPIO [' + gpioNumber + ']  with value [' + value + '] to client!');
+				});
+			}
+		}
+
+		app_data.gpios[gpioIndex].direction = gpioDirection;
+		app_data.gpios[gpioIndex].edge = ((gpioDirection=='in') ? gpioEdge : 'none');
+		app_data.gpios[gpioIndex].description = gpioDescription;
+		app_data.gpios[gpioIndex].value = ((gpioDirection=='out') ? gpioValue : 0);
+		var result = app_data.gpios[gpioIndex];
+		
+		// if the direction is OUT let's write to the board
+		if(gpioDirection == 'out') app.locals.board[gpioNumber].writeSync(gpioValue);
+
+		// writing data to the disk
+		writeAppData();
+		
+		res.send(JSON.stringify(result));		
+	}	
+}); 
+
+// removes a GPIO from the app local array
+app.delete('/removegpio/:gpio', function(req, res){ 
+	var gpioNumber = req.params.gpio;
+
+	// searching for the gpio
+	var found = findGpio(gpioNumber);
+	var gpioIndex = found.index;
+
+	// if the gpio is not found
+	if (gpioIndex == -1) {
+		res.status(500).send('GPIO NOT found!');
+	} else {
+		if(app_data.gpios[gpioIndex].direction == 'out') {
+			// if the direction is OUT I simply set the GPIO level to 0
+			app.locals.board[gpioNumber].writeSync(0);
+		} else {
+			// if the diection is IN and the GPIO is active I remove any watching from this GPIO
+			if(app_data.gpios[gpioIndex].active == 1) app.locals.board[gpioNumber].unwatchAll();		
+		}
+		app.locals.board[gpioNumber].unexport();
+		app.locals.board[gpioNumber] = null;	
+		app_data.gpios.splice(gpioIndex, 1); // I remove the i element
+
+		writeAppData();
+
+		res.send("GPIO " + gpioNumber + " successfully removed!");		
+	}
+});
+
 
 // login 
 app.post('/login', function(req, res){
@@ -343,86 +265,75 @@ app.get('/logout', function(req, res){
 }); 
 
 
-/* app.post('/setpin', function(req, res){
-	var pinNumber = req.body.number;
-	var pinDirection = req.body.direction;
-	var pinValue = req.body.value;
-	app.locals.gpios[pinNumber].direction = pinDirection;
-	app.locals.gpios[pinNumber].value = pinValue;
-	var pin = new GPIO(pinNumber, pinDirection);
-    	pin.writeSync(pinValue);
-	var out = app.locals.gpios[pinNumber];
-	res.send(JSON.stringify(out));
-});*/ 
-
-
-
 var server = app.listen(3000);
 console.log('Express started on port ' + 3000); 
 
-//Socket test
+var options = { pingInterval: 10000, pingTimeout: 5000 };
 
-/* var io = require('socket.io').listen(server);
+var io = require('socket.io').listen(server, options);
 
-io.on('connection', function (socket) {
-	console.log('timeout started');
-	setTimeout(function(){
-		console.log("emitted1");
-		socket.emit('receiver',{ 'sender':'dummy1','value': 1 });
-	}, 10000);
-	setTimeout(function(){
-		console.log("emitted2");
-		socket.emit('receiver',{ 'sender':'dummy2','value': 0 });
-	}, 30000);
+//var storeEachSocket = {};
+
+io.set('authorization', function(handshake, accept){
+	//var user = handshake._query.user;
+	//  if(user in storeEachSocket) {
+		//accept('User already connected', false);
+	//  }
+  	//else {
+		accept(null, true);
+	//}
 });
 
-*/
+// start listen with socket.io - simmaco
+io.on('connection', function(socket){
+	privateSocket = socket;
 
-setSocketConnection();
+	//var query = socket.handshake.query;
+	//var user = query.user;
+	//storeEachSocket[user] = socket;
 
-
-function setSocketConnection() {
-	var io = require('socket.io').listen(server);
+	//socket.on('fromClient', function(msg){
+	//	io.emit('toClient', msg);
+	//});
 	
-	// Web Socket Connection
-	io.on('connection', function (socket) {
-		for (i = 0; i < app_data.gpios.length; i++) {
-			var x = app_data.gpios[i];
-			var gpioNumber = x.gpio;
-			if (x.direction == "in") {
-				if (x.active == 1) {
-					console.log("Started watching on " + app_data.gpios[i].gpio);
-					(function(i){
-						var sender = app_data.gpios[i].gpio;
-						console.log('sender ' + sender);
-						app.locals.board[sender].watch(function (err, value) {
-							 if (err) throw err;
-							socket.emit('receiver',{ 'sender':sender,'value': value });
-							console.log("*** DO SOME OTHER STUFF!");
-						});
-					})(i);
-				} else {
-					var sender = app_data.gpios[i].gpio;
-					console.log("Stopped watching on " + sender);
-					if (app.locals.board[sender]) {
-						app.locals.board[sender].unwatchAll();
-					}
+
+	for (i = 0; i < app_data.gpios.length; i++) {
+		var gpioPort = app_data.gpios[i];
+		if (gpioPort.direction == 'in') {
+			if (gpioPort.active == 1) {
+				(function(i){
+					var gpioNumber = app_data.gpios[i].gpio;
+					app.locals.board[gpioNumber].watch(function (err, value) {
+						if (err) throw err;
+						app_data.gpios[i].value = value;
+						socket.emit('toClient', { 'gpio':gpioNumber,'value': value });
+					});						
+					console.log("Started watching on " + gpioNumber + "!");
+
+				})(i);
+			} else {
+				var gpioNumber = app_data.gpios[i].gpio;
+				console.log("Stopped watching on " + gpioNumber + "!");
+				if (app.locals.board[gpioNumber]) {
+					app.locals.board[gpioNumber].unwatchAll();
 				}
+
 			}
+			console.log(JSON.stringify( app_data.gpios[i]));
 		}
-	});
-	
-}
+	}
+});
+
+io.on('disconnect', function(socket){
+	console.log('disconnected');
+	//var query = socket.handshake.query;
+	//var user = query.user;
+	//delete storeEachSocket[user]
+	privateSocket = null;
+ });
+
 
 // FUNCTIONS
-
-// dummy database 
-hash(adminPassword, function(err, salt, hash){ 
-	if (err) throw err; 
-	// store the salt & hash in the "db"
-	users.admin.salt = salt; 
-	users.admin.hash = hash.toString();
-}); 
 
 // Authenticate using our plain-object database of doom!
 function authenticate(name, pass, fn) { 
@@ -441,3 +352,34 @@ function logger(req,res,next){
   next();
 }
 
+function findGpio(gpioNumber) {
+	var result = {};
+	result.index = -1;
+	result.gpio = {};
+	var found = -1;
+	var i = 0;
+	while ((found == -1) && (i < app_data.gpios.length)) {
+		if (app_data.gpios[i].gpio == gpioNumber) { // the gpio already exists
+			found = i; // I take the element's index
+		}
+		i++;
+	}
+
+	// if the gpio has been found
+	if (found >= 0) {
+		result.index = found;
+		result.gpio = app_data.gpios[found];
+	}
+	
+	return result;
+}
+
+function writeAppData() {
+	var result = {};
+	var jsonfile = require('jsonfile');
+	var file = 'app_data.json'
+ 
+	jsonfile.writeFile(file, app_data, function (err) {
+		if(err) throw(err);
+	});
+};

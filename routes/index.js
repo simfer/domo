@@ -1,9 +1,14 @@
 var express = require('express');
 var router = express.Router();
-var my_data = {title: 'pippo',supplies: ['mop', 'broom', 'duster']};
 
 router.get('/', function(req, res) {
 	res.render('index');
+});
+
+router.get('/error', function(req, res) {
+	var data = {};
+	data.message = req.session.error;
+	res.render('error',data);
 });
 
 router.get('/home', function(req, res) {
