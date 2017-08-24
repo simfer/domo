@@ -2,6 +2,7 @@ var express = require('express');
 var session = require('express-session');
 var socket_io = require('socket.io');
 var hash = require('./pass').hash;
+var pidetect = require('./pidetect');
 var ejs = require('ejs');
 var privateSocket = null;
 
@@ -9,13 +10,14 @@ var routes = require('./routes/index');
 var bodyParser = require("body-parser");
 
 // detecting if we are on a real RASPBERRY or not
-const pitect = require('pitect');
-if(pitect.isPi()) {
+//const pitect = require('pitect');
+
+if(pidetect.isPi()) {
 	console.log('This is a Raspberry Pi.');
-	console.log('This is: ' + pitect.piModel().name);
+	console.log('This is: ' + pidetect.piModel().name);
 	var GPIO = require('onoff').Gpio;	
 } else {
-	console.log('This is not a Raspberry');
+	console.log('This is not a Raspberry!');
 	var GPIO = require("./fakeonoff.js");
 }
 
