@@ -12,7 +12,7 @@ router.get('/error', function(req, res) {
 });
 
 router.get('/home', function(req, res) {
-	if (req.session.authenticated || 1) {
+	if (req.session.authenticated) {
 		var app_data = req.app.get('app_data');
 		res.render('home',app_data);
 	}

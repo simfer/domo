@@ -22,7 +22,7 @@ if(pidetect.isPi()) {
 }
 
 // dummy database 
-// the following two lines should be managed differently
+// the following two lines should be managed differently  
 var users = { admin: { name: 'admin', password: 'Admin123' }};
 hash(users.admin.password, function(err, salt, hash){ 
 	if (err) throw err; 
@@ -240,23 +240,55 @@ app.post('/login', function(req, res){
 	var username = req.body.username;
 	var password = req.body.password;
 	req.session.authenticated = false;
-	authenticate(username, password, function(err, user){ 
-		if (user) { 
+	
+	authenticate(username, password, function(err, user) { 
+		if (user) {
+			console.log("user found");
+			console.log(user);
 			req.session.regenerate(function(){
 				// Store the user's primary key 
 				// in the session store to be retrieved,
 				// or in this case the entire user object 
 				req.session.user = user;
 				req.session.authenticated = true;
-				res.redirect('home'); 
+				res.redirect('/home'); 
 			}); 
 		} else {
-			req.session.error = app_data.language.EINVUIDPWD; 
+			console.log(err);
+			req.session.error = err.message; //app_data.language.EINVUIDPWD; 
 			res.redirect('/');
-		} 
-	}); 
+		}
+	});
 }); 
 
+// Authenticate using our plain-object database of doom!
+function authenticate(name, pass, fn) {
+	var sqlite3 = require('sqlite3').verbose();
+	var db = new sqlite3.Database('domodb');
+
+ 	db.serialize(function () {
+		console.log(name);
+		var stmt = 'SELECT * FROM users WHERE username = "' + name + '"';
+        db.get(stmt, function(err, row){
+			//db.each('SELECT * FROM users WHERE username = "' + name + '"', function (err, row) {
+			if(err) return fn(err);
+			if(typeof row == "undefined") {
+				return fn(new Error('User not found!'));
+			} else {
+				console.log(pass);
+				console.log(row.salt);
+				hash(pass, row.salt, function(err, hash){
+					if (err) return fn(err);
+					if (hash.toString() == row.hash) return fn(null, row);
+					fn(new Error('Invalid password!'));
+				});
+			}
+		});
+	});
+	db.close();
+} 
+
+	
 // logout
 app.get('/logout', function(req, res){
 	// destroy the user's session to log them out 
@@ -338,15 +370,30 @@ io.on('disconnect', function(socket){
 // FUNCTIONS
 
 // Authenticate using our plain-object database of doom!
-function authenticate(name, pass, fn) { 
-	var user = users[name]; 
-	// query the db for the given username
-	if (!user) return fn(new Error('User not found!'));
-    hash(pass, user.salt, function(err, hash){
-		if (err) return fn(err);
-		if (hash.toString() == user.hash) return fn(null, user);
-		fn(new Error('Invalid password!'));
+function authenticate(name, pass, fn) {
+	var sqlite3 = require('sqlite3').verbose();
+	var db = new sqlite3.Database('domodb');
+
+ 	db.serialize(function () {
+		console.log(name);
+		var stmt = 'SELECT * FROM users WHERE username = "' + name + '"';
+        db.get(stmt, function(err, row){
+			//db.each('SELECT * FROM users WHERE username = "' + name + '"', function (err, row) {
+			if(err) return fn(err);
+			if(typeof row == "undefined") {
+				return fn(new Error('User not found!'));
+			} else {
+				console.log(pass);
+				console.log(row.salt);
+				hash(pass, row.salt, function(err, hash){
+					if (err) return fn(err);
+					if (hash.toString() == row.hash) return fn(null, row);
+					fn(new Error('Invalid password!'));
+				});
+			}
+		});
 	});
+	db.close();
 } 
 
 function logger(req,res,next){
