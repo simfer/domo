@@ -1,0 +1,54 @@
+{
+    "languages": {
+        "EN": [
+            {
+                "inputTableTitle": "INPUT Ports",
+                "outputTableTitle": "OUTPUT Ports",
+                "msgInEditTitle": "INPUT Port",
+                "msgOutEditTitle": "OUTPUT Port",
+                "add": "Add",
+                "active": "Active",
+                "gpio": "GPIO",
+                "edge": "EDGE",
+                "direction": "Direction",
+                "description": "Description",
+                "value": "Value",
+                "status": "Status",
+                "actions": "Actions",
+                "on": "ON",
+                "off": "OFF",
+                "ok": "OK!",
+                "alarm": "ALARM!",
+                "cancel": "Cancel",
+                "save": "Save",
+                "error": "ERROR",
+                "EINVUIDPWD": "Invalid user ID and/or password!"
+            }
+        ],
+        "IT": [
+            {
+                "inputTableTitle": "Porte di INPUT",
+                "outputTableTitle": "Porte di OUTPUT",
+                "msgInEditTitle": "Porta di INPUT",
+                "msgOutEditTitle": "Porta di OUTPUT",
+                "add": "Aggiungi",
+                "active": "Attivo",
+                "gpio": "GPIO",
+                "edge": "EDGE",
+                "direction": "Direzione",
+                "description": "Descrizione",
+                "value": "Valore",
+                "status": "Stato",
+                "actions": "Azioni",
+                "on": "Acceso",
+                "off": "Spento",
+                "ok": "OK!",
+                "alarm": "ALLARME!",
+                "cancel": "Annulla",
+                "save": "Salva",
+                "error": "ERRORE",
+                "EINVUIDPWD": "Password e/o nome utente non validi!"
+            }
+        ]
+    }
+}
